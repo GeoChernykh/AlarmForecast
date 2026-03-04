@@ -8,8 +8,7 @@ from flask import Flask, jsonify, request
 from ..errors import InvalidUsage
 
 
-# WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY")
-WEATHER_API_KEY = "2AWEHQ2Z5ZA7EBLZQF35K7WXB"
+WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY")
 
 
 def get_forecast(location, start_date, end_date, unit_group="metric"):
