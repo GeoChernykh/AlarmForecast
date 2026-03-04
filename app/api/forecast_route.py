@@ -8,17 +8,9 @@ from ..core.forecast import get_forecast
 forecast_bp = Blueprint("forecast", __name__, url_prefix="/forecast")
 
 
-@forecast_bp.route("/tomorrow", methods=["GET"])
-def get_forecast_endpoint():
-    if not request.is_json:
-        raise InvalidUsage("JSON body required", status_code=400)
-
-    json_data = request.get_json() or {}
-
-    if json_data.get("location") is None:
-        raise InvalidUsage("location required", status_code=400)
-    
-    location = json_data.get("location")
+@forecast_bp.route("", methods=["GET"])
+def forecast_endpoint():
+    location = request.args.get("location")
 
     curr_datetime = dt.datetime.now()
     start_date = curr_datetime.date()
