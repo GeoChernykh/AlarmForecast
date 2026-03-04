@@ -5,7 +5,7 @@ import time
 from urllib.parse import urljoin
 
 
-def parse_isw(max_pages=3):
+def scrape_isw(max_pages=3):
     base_url = "https://understandingwar.org"
 
     headers = {
@@ -121,4 +121,4 @@ def parse_isw(max_pages=3):
 
 
 if __name__ == "__main__":
-    parse_isw(max_pages=1)
+    scrape_isw(max_pages=71)
