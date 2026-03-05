@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+from dotenv import load_dotenv
 import os
 
 import requests
@@ -7,8 +8,9 @@ from flask import Flask, jsonify, request
 
 from ..errors import InvalidUsage
 
+load_dotenv()
 
-WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY")
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 
 def get_forecast(location, start_date, end_date, unit_group="metric"):
