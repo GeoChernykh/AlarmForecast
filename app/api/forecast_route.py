@@ -12,6 +12,9 @@ forecast_bp = Blueprint("forecast", __name__, url_prefix="/forecast")
 def forecast_endpoint():
     location = request.args.get("location")
 
+    if location is None:
+        raise InvalidUsage("location is required", status_code=400)
+
     curr_datetime = dt.datetime.now()
     start_date = curr_datetime.date()
     end_date = start_date + dt.timedelta(days=1)

@@ -20,10 +20,10 @@ def get_alarm_status():
     """
     BASE_URL = "https://api.ukrainealarm.com/api/v3/alerts"
 
-    headers = {}
-    
+    headers = dict()
+
     if ALARM_API_KEY:
-        headers["Authorization"] = f"Bearer {ALARM_API_KEY}"
+        headers["Authorization"] = f"{ALARM_API_KEY}"
 
     response = requests.get(BASE_URL, headers=headers)
     if response.status_code == requests.codes.ok:
