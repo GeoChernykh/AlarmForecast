@@ -61,9 +61,7 @@ def get_alarm_status():
         return []
 
 
-def format_alarm() -> dict:
-    alarm_data = get_alarm_status()
-
+def format_alarm(alarm_data) -> dict:
     regions = [
         {
             "region": region,
@@ -86,4 +84,4 @@ def format_alarm() -> dict:
 
 
 if __name__ == "__main__":
-    print(get_alarm_status())
+    print(format_alarm(get_alarm_status()))

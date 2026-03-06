@@ -5,7 +5,7 @@ from app.errors import register_error_handlers
 def create_app():
     app = Flask(__name__)
 
-
+    
 
     register_error_handlers(app)
 
