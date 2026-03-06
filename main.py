@@ -20,37 +20,16 @@ def create_app():
 app = create_app()
 
 def _parse_date(raw: str) -> datetime | None:
-    """Convert an ISW date string into a :class:`datetime`.
-
-    The format may be like ``March 4, 2026`` or ``2026-03-04``.  If parsing
-    fails we return ``None``.
-    """
     for fmt in ("%B %d, %Y", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(raw, fmt)
-        except Exception:
-            continue
+        return datetime.strptime(raw, fmt)
     return None
 
 def _get_last_date_from_json(file_path: Path) -> datetime | None:
-    """Return the latest date recorded in the JSON file.
-
-    If the file is missing, empty, or contains invalid JSON we return ``None``
-    and the caller will treat the dataset as empty.  Any errors during load are
-    caught so the script does not crash.
-    """
     if not file_path.exists():
         return None
 
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception as e:  # including JSONDecodeError
-        print(f"warning: could not read JSON from {file_path}: {e}")
-        return None
-
-    if not isinstance(data, list):
-        return None
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
     dates: list[datetime] = []
     for item in data:
@@ -84,7 +63,7 @@ def _run_scraper_range():
         new_items = scrape_isw(start_date=start_str, end_date=end_str,
                                save_result=False, max_pages=100) or []
         if not new_items:
-            print("scraper returned no new articles")
+            print("no new articles")
             return
 
         filtered: list[dict] = []
@@ -119,7 +98,7 @@ def _run_scraper_range():
         default_start = datetime(2022, 2, 24)
         start_str = default_start.strftime("%Y-%m-%d")
         end_str = today.strftime("%Y-%m-%d")
-        print(f"no existing ISW data; scraping full range {start_str} to {end_str}")
+        print(f"no existing ISW data => scraping full range {start_str} to {end_str}")
         scrape_isw(start_date=start_str, end_date=end_str, save_result=True, max_pages=100)
 
 if __name__ == "__main__":
