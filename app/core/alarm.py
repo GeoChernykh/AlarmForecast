@@ -48,7 +48,7 @@ def get_alarm_status():
     BASE_URL = "https://api.ukrainealarm.com/api/v3/alerts"
 
     headers = {
-        "Authorization": f"Bearer {ALARM_API_KEY}",
+        "Authorization": f"{ALARM_API_KEY}",
         "User-Agent": "Mozilla/5.0",
         "Accept": "application/json",
     }
