@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 import os
 
 import requests
-from flask import Flask, jsonify, request
 
 from ..errors import InvalidUsage
 
@@ -22,7 +21,7 @@ def get_forecast(location, start_date, end_date, unit_group="metric"):
     print(response.json())
 
     if response.status_code == requests.codes.ok:
-        return json.loads(format_forecast(response, start_date, end_date))
+        return format_forecast(json.loads(response.text), start_date, end_date)
     else:
         raise InvalidUsage(response.text, status_code=response.status_code)
 
@@ -52,4 +51,4 @@ def format_forecast(raw_forecast, start_date, end_date):
 
 
 if __name__ == "__main__":
-    print(get_forecast(location="Kyiv,Ukraine", start_date="2026-03-06", end_date="2026-03-06"))
+    print(get_forecast(location="Kyiv,Ukraine", start_date="2026-03-06", end_date="2026-03-07"))
