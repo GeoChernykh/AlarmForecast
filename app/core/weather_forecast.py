@@ -18,7 +18,6 @@ def get_forecast(location, start_date, end_date, unit_group="metric"):
     request_url = f"{BASE_URL}/{location}/{start_date}/{end_date}?unitGroup={unit_group}&key={WEATHER_API_KEY}&include=hours&elements={elements}&lang=en"
 
     response = requests.get(request_url)
-    print(response.json())
 
     if response.status_code == requests.codes.ok:
         return format_forecast(json.loads(response.text), start_date, end_date)
