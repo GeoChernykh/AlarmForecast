@@ -6,9 +6,10 @@ from urllib.parse import urljoin
 from tqdm import tqdm
 from pathlib import Path
 from datetime import datetime, timedelta
+import re
 
 
-def scrape_isw(start_date, end_date, save_result=False, file_name="isw_data.json", max_pages=3):
+def scrape_isw(start_date, end_date, save_result=False, file_name="isw_data_v2.json", max_pages=3):
     base_url = "https://understandingwar.org"
 
     headers = {
@@ -66,47 +67,27 @@ def scrape_isw(start_date, end_date, save_result=False, file_name="isw_data.json
                 if meta_date:
                     date = meta_date.get('content', '').split('T')[0]
 
-            takeaways = []
+            text_div = page_soup.find("div", id="printable-area").find("div", class_="dynamic-entry-content")
+            
+            endnotes = text_div.find("div", title="Endnotes")
+            if endnotes:
+                endnotes.decompose()
 
-            kt_container = page_soup.find(attrs={"data-id": "key-takeaways"})
-            if kt_container:
-                list_elem = kt_container.find(['ul', 'ol'])
-                if list_elem:
-                    for li in list_elem.find_all('li'):
-                        takeaways.append(li.text.strip())
-
-            if not takeaways:
-                headers_tags = page_soup.find_all(['h2', 'h3', 'strong'])
-                for header in headers_tags:
-                    if "Key Takeaways" in header.text or "Toplines" in header.text:
-                        parent = header.parent if header.name == 'strong' else header
-                        curr = parent.find_next_sibling()
-                        while curr:
-                            if curr.name in ['ul', 'ol']:
-                                for li in curr.find_all('li'):
-                                    takeaways.append(li.text.strip())
-                                break
-
-                            nested_list = curr.find(['ul', 'ol'])
-                            if nested_list:
-                                for li in nested_list.find_all('li'):
-                                    takeaways.append(li.text.strip())
-                                break
-
-                            if curr.name in ['h2', 'h3']:
-                                break
-                            curr = curr.find_next_sibling()
-                        if takeaways:
-                            break
-
-            if not takeaways:
-                takeaways.append("no key takeways")
-
+            text = text_div.get_text(separator=" ", strip=False)
+            
+            # Clean the text: remove URLs, newlines, and bracketed numbers
+            text = re.sub(r'https?://\S+', '', text)
+            text = re.sub(r'www\.\S+', '', text)
+            text = re.sub(r'Endnotes \S+', '', text)
+            text = re.sub(r'\n+', ' ', text)
+            text = re.sub(r'\[\d+\]', '', text)
+            text = re.sub(r'\s+', ' ', text).strip()
+        
             news_data.append({
                 "date": date,
                 "title": title,
                 "url": link,
-                "key_takeaways": takeaways
+                "text": text
             })
 
             time.sleep(0.5)
@@ -160,9 +141,9 @@ def _get_last_date_from_json(file_path: Path) -> datetime | None:
     return max(dates) if dates else None
 
 def _run_scraper_range():
-    data_file = Path("data/isw/isw_data.json")
+    data_file = Path("data/isw/isw_data_v2.json")
 
-    last_dt = _get_last_date_from_json(data_file)
+    last_dt = _get_last_date_from_json(data_file) if data_file.exists() else None
     today = datetime.today()
 
     today_str = today.strftime("%Y-%m-%d")
@@ -216,7 +197,9 @@ def _run_scraper_range():
         start_str = default_start.strftime("%Y-%m-%d")
         end_str = today.strftime("%Y-%m-%d")
         print(f"no existing ISW data => scraping full range {start_str} to {end_str}")
-        scrape_isw(start_date=start_str, end_date=end_str, save_result=True, max_pages=100)
+        scrape_isw(start_date=start_str, end_date=end_str, 
+                   save_result=True, file_name="isw_data_v2", 
+                   max_pages=100)
 
 if __name__ == "__main__":
     _run_scraper_range()
