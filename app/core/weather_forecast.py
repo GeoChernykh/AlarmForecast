@@ -14,7 +14,7 @@ WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 def get_forecast(location, start_date, end_date, unit_group="metric"):
     BASE_URL = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline"
-    elements = "datetime,humidity,offset,temp,windspeed,pressure,visibility,severerisk,offsetseconds,cloudcover"
+    elements = "datetime,humidity,offset,temp,windspeed,pressure,visibility,severerisk,offsetseconds,cloudcover" # TODO: Match with training dataset
     request_url = f"{BASE_URL}/{location}/{start_date}/{end_date}?unitGroup={unit_group}&key={WEATHER_API_KEY}&include=hours&elements={elements}&lang=en"
 
     response = requests.get(request_url)
