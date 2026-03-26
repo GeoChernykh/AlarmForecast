@@ -5,11 +5,16 @@ import time
 from urllib.parse import urljoin
 from tqdm import tqdm
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import re
 
 
-def scrape_isw(start_date, end_date, save_result=False, file_name="isw_data_v2.json", max_pages=3):
+def scrape_isw(start_date: date = date(2022, 2, 24), end_date: date = date.today(), save_result=False, file_name="isw_data_v2.json", max_pages=3):
+    if not isinstance(start_date, date):
+        start_date = start_date.date()
+    if not isinstance(end_date, date):
+        end_date=end_date.date()
+    
     base_url = "https://understandingwar.org"
 
     headers = {
@@ -18,7 +23,7 @@ def scrape_isw(start_date, end_date, save_result=False, file_name="isw_data_v2.j
 
     all_articles_links = []
 
-    url = f"{base_url}/research/?_date_from={start_date}%2C{end_date}&_teams=russia-ukraine"
+    url = f"{base_url}/research/?_date_from={start_date.strftime("%Y-%m-%d")}%2C{end_date.strftime("%Y-%m-%d")}&_teams=russia-ukraine"
 
     for page in tqdm(range(1, max_pages + 1), desc="Scraping pages:"):
         if page != 1:
@@ -58,14 +63,14 @@ def scrape_isw(start_date, end_date, save_result=False, file_name="isw_data_v2.j
             title_tag = page_soup.select_one('h1.gb-headline, h1#page-title, h1')
             title = title_tag.text.strip() if title_tag else "no title"
 
-            date = "no data"
+            date_ = "no data"
             date_tag = page_soup.select_one('h6.gb-text')
             if date_tag and "202" in date_tag.text:
-                date = date_tag.text.strip()
+                date_ = date_tag.text.strip()
             else:
                 meta_date = page_soup.find('meta', property='article:published_time')
                 if meta_date:
-                    date = meta_date.get('content', '').split('T')[0]
+                    date_ = meta_date.get('content', '').split('T')[0]
 
             text_div = page_soup.find("div", id="printable-area").find("div", class_="dynamic-entry-content")
             
@@ -83,12 +88,15 @@ def scrape_isw(start_date, end_date, save_result=False, file_name="isw_data_v2.j
             text = re.sub(r'\[\d+\]', '', text)
             text = re.sub(r'\s+', ' ', text).strip()
         
-            news_data.append({
-                "date": date,
-                "title": title,
-                "url": link,
-                "text": text
-            })
+            if start_date <= datetime.strptime(date_, "%B %d, %Y").date() <= end_date:
+                news_data.append({
+                    "date": date_,
+                    "title": title,
+                    "url": link,
+                    "text": text
+                })
+            else:
+                break
 
             time.sleep(0.5)
 
@@ -202,4 +210,5 @@ def _run_scraper_range():
                    max_pages=100)
 
 if __name__ == "__main__":
-    _run_scraper_range()
+    # _run_scraper_range()
+    scrape_isw(start_date=date.today() - timedelta(days=31), save_result=True, file_name="temp", max_pages=100)
