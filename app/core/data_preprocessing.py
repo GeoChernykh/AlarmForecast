@@ -240,7 +240,7 @@ stop_words = {
  'yourselves',
  "dot"}
 
-def isw_preprocess(isw):
+def create_features_isw(isw):
     isw = isw.loc[isw.date >= datetime(2022, 2, 24).date()]
 
     isw["text_length"] = isw['text'].apply(len)
