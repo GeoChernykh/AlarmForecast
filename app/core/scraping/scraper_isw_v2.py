@@ -32,7 +32,7 @@ def scrape_isw(start_date: date | str = date(2022, 2, 24), end_date: date | str 
 
     all_articles_links = []
 
-    url = f"{base_url}/research/?_date_from={start_date.strftime("%Y-%m-%d")}%2C{end_date.strftime("%Y-%m-%d")}&_teams=russia-ukraine"
+    url = f"{base_url}/research/?_date_from={start_date.strftime('%Y-%m-%d')}%2C{end_date.strftime('%Y-%m-%d')}&_teams=russia-ukraine"
 
     for page in tqdm(range(1, max_pages + 1), desc="Scraping pages:"):
         if page != 1:
