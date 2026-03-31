@@ -1,4 +1,7 @@
 import sqlite3
+import json
+from pathlib import Path
+from app.core.scraping.scraper_isw_v2 import scrape_isw
 
 
 class IswDb:
@@ -15,32 +18,33 @@ class IswDb:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date TEXT NOT NULL,
                 title TEXT NOT NULL,
-                url TEXT NOT NULL,
+                url TEXT NOT NULL UNIQUE,
                 text TEXT NOT NULL
             )
         """)
         self.con.commit()
 
-    def close(self) -> None:
-        self.con.close()
+    def load_existing(self) -> None:
+        path = Path('data/isw/isw_data_v2.json')
 
-    # --- context manager support ---
-    def __enter__(self):
-        return self
+        if not path.exists():
+            raise FileNotFoundError(f"Path not found: {path}")
+        
+        with open(path, encoding="utf-8") as f:
+            articles = json.load(f)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type:
-            self.con.rollback()
-        else:
-            self.con.commit()
-        self.close()
-
-    def add_article(self, date, title, url, text) -> None:
-        self.con.execute(
-            "INSERT INTO articles (date, title, url, text) VALUES (?, ?, ?)", (date, title, url, text)
+        self.con.executemany(
+            "INSERT OR IGNORE INTO articles (date, title, url, text) VALUES (:date, :title, :url, :text)", articles
         )
+        self.con.commit()
 
-    def get_articles(
+    def add(self, articles) -> None:
+        self.con.executemany(
+            "INSERT OR IGNORE INTO articles (date, title, url, text) VALUES (:date, :title, :url, :text)", articles
+        )
+        self.con.commit()
+
+    def get(
         self,
         start_date: str | None = None,
         end_date: str | None = None,
@@ -68,3 +72,20 @@ class IswDb:
     def get_latest_date(self) -> str | None:
         row = self.con.execute("SELECT MAX(date) FROM articles").fetchone()
         return row[0]  # returns None if table is empty
+    
+    def update(self) -> None:
+        latest_date = self.get_latest_date()
+
+        if not latest_date:
+            try:
+                self.load_existing()
+                print("Data loaded succesfully.")
+                latest_date = self.get_latest_date()
+            except FileNotFoundError:
+                print("No existing data. Scraping...")
+
+        articles = scrape_isw(start_date=latest_date, max_pages=100)
+        if articles:
+            self.add(articles)
+
+        

@@ -9,12 +9,15 @@ from datetime import datetime, timedelta, date
 import re
 
 
-def scrape_isw(start_date: date = date(2022, 2, 24), end_date: date = date.today(), save_result=False, file_name="isw_data_v2.json", max_pages=3):
+def scrape_isw(start_date: date | str = date(2022, 2, 24), end_date: date | str = date.today(), save_result=False, file_name="isw_data_v2.json", max_pages=3):
     # Convert string dates to date objects
     if isinstance(start_date, str):
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
     elif isinstance(start_date, datetime):
         start_date = start_date.date()
+
+    if start_date is None:
+        start_date = date(2022, 2, 24)
     
     if isinstance(end_date, str):
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
@@ -116,8 +119,11 @@ def scrape_isw(start_date: date = date(2022, 2, 24), end_date: date = date.today
                     "url": link,
                     "text": text
                 })
+                out_of_range = 0  # reset on a valid article
             else:
-                break
+                out_of_range += 1
+                if out_of_range >= 3:  # stop only after 3 consecutive misses
+                    break
 
             time.sleep(0.5)
 
@@ -231,5 +237,5 @@ def _run_scraper_range():
                    max_pages=100)
 
 if __name__ == "__main__":
-    # _run_scraper_range()
-    scrape_isw(start_date=date.today() - timedelta(days=60), save_result=True, file_name="temp", max_pages=100)
+    _run_scraper_range()
+    # scrape_isw(start_date=date.today() - timedelta(days=60), save_result=True, file_name="temp", max_pages=100)
