@@ -8,6 +8,7 @@ from typing import Optional
 import requests
 
 from app.errors import InvalidUsage
+from app.core.features.alarms_features import explode_by_hour
 
 
 load_dotenv()
@@ -55,7 +56,7 @@ def get_alarms_history(date: dt.date):
     except (requests.RequestException, ValueError):
         return []
 
-def region_hierarchy(path: Path = alarms_path / "regions_list.json") -> dict:
+def get_correct_regions(path: Path = alarms_path / "regions_list.json") -> dict:
     if not path.exists():
         raise FileNotFoundError(f"Region hierarchy file not found: {path}")
     with open(path, encoding="utf-8") as f:
@@ -63,8 +64,7 @@ def region_hierarchy(path: Path = alarms_path / "regions_list.json") -> dict:
 
     correct_regions = dict()
 
-    correct_regions['564'] = ('12', "Запорізька область") # hardcoded fix
-    correct_regions['1293'] = ('22', "Харківська область") # hardcoded fix
+    
 
     for state in states:
         region_id = state['regionId']
@@ -74,7 +74,7 @@ def region_hierarchy(path: Path = alarms_path / "regions_list.json") -> dict:
         if region_id == '0' or region_id == '9999':
             continue
         
-        child_ids = set()
+        child_ids = {region_id}
 
         for district in state['regionChildIds']:
             child_ids.add(district['regionId'])
@@ -85,7 +85,9 @@ def region_hierarchy(path: Path = alarms_path / "regions_list.json") -> dict:
         for id in child_ids:
             correct_regions[id] = (region_id, region_name)
 
-    
+    correct_regions['564'] = ('12', "Запорізька область") # hardcoded fix
+    correct_regions['1293'] = ('22', "Харківська область") # hardcoded fix
+
     return correct_regions
 
 def _parse_dt(s: Optional[str]) -> Optional[dt.datetime]:
@@ -99,8 +101,48 @@ def _parse_dt(s: Optional[str]) -> Optional[dt.datetime]:
     datetime = dt.datetime.fromisoformat(s)
     return datetime
 
+def _merge_intervals(group, group_name):
+    group = group.sort_values('start')
+    
+    region_city = group_name
+    region_id = group['region_id'].iloc[0]
+    region_title = group['region_title'].iloc[0]
+
+    merged = []
+    current_start = None
+    current_end = None
+
+    for _, row in group.iterrows():
+        start, end = row['start'], row['end']
+        
+        if current_start is None:
+            current_start, current_end = start, end
+        else:
+            # якщо поточний або новий інтервал ще не закінчився — об'єднуємо
+            if pd.isna(current_end) or pd.isna(end):
+                if start <= (current_end if pd.notna(current_end) else start):
+                    current_end = pd.NaT  # незакритий інтервал поглинає все
+                else:
+                    merged.append((current_start, current_end))
+                    current_start, current_end = start, end
+            elif start <= current_end:
+                current_end = max(current_end, end)
+            else:
+                merged.append((current_start, current_end))
+                current_start, current_end = start, end
+    
+    if current_start is not None:
+        merged.append((current_start, current_end))
+    
+    result = pd.DataFrame(merged, columns=['start', 'end'])
+    result['region_city'] = region_city
+    result['region_id'] = region_id
+    result['region_title'] = region_title
+
+    return result
+
 def merge_alarms(raw_alarms, correct_regions):
-    alarms = pd.DataFrame(columns=["region_id", "region_title", "region_city", "start", "end"])
+    rows = []
 
     for alarm in raw_alarms:
         region_data = correct_regions.get(alarm['regionId'])
@@ -109,7 +151,8 @@ def merge_alarms(raw_alarms, correct_regions):
             continue
 
         region_id, region_name = region_data
-        if region_name == 'Київ':
+
+        if region_name == 'м. Київ':
             region_title = 'Київська область'
             region_city = 'Київ'
         else:
@@ -119,44 +162,36 @@ def merge_alarms(raw_alarms, correct_regions):
         start = _parse_dt(alarm['startDate'])
         end = _parse_dt(alarm['endDate'])
 
-        row = [region_id, region_title, region_city, start, end]
-        
-        alarms.loc[len(alarms)] = row
+        # замінюємо "порожню" дату
+        if end == pd.Timestamp('0001-01-01'):
+            end = pd.NaT
 
-    alarms['start'] = pd.to_datetime(alarms['start'])
-    alarms['end'] = pd.to_datetime(alarms['end'])
+        rows.append([region_id, region_title, region_city, start, end])
 
-    alarms.loc[alarms.end == pd.to_datetime('0001-01-01 00:00:00.000000'), "end"] = None
+    alarms = pd.DataFrame(rows, columns=[
+        "region_id", "region_title", "region_city", "start", "end"
+    ])
 
-    # сортування
-    alarms = alarms.sort_values(['region_city', 'start'])
+    alarms['start'] = pd.to_datetime(alarms['start']).dt.floor('min')
+    alarms['end'] = pd.to_datetime(alarms['end']).dt.floor('min')
 
-    # попередній кінець в межах міста
-    alarms['prev_end'] = alarms.groupby('region_city')['end'].shift()
-
-    # новий інтервал, якщо немає перекриття
-    alarms['new_group'] = (alarms['start'] > alarms['prev_end']).astype(int)
-
-    # унікальний id інтервалу
-    alarms['interval_id'] = alarms.groupby('region_city')['new_group'].cumsum()
-
-    # агрегуємо
-    alarms = (
-        alarms.groupby(['region_city', 'interval_id'], as_index=False)
-        .agg({
-            'region_id': 'first',
-            'region_title': 'first',
-            'start': 'min',
-            'end': 'max'
-        })
-        .drop(columns='interval_id')
+    # застосування по region_city
+    result = (
+        alarms.groupby('region_city')
+        .apply(lambda g: _merge_intervals(g, g.name))
+        .reset_index(drop=True)
     )
 
-    alarms['start'] = alarms['start'].dt.tz_localize('UTC').dt.tz_convert('Europe/Kyiv')
-    alarms['end'] = alarms['end'].dt.tz_localize('UTC').dt.tz_convert('Europe/Kyiv')
+    return result
 
-    return alarms
+def get_alarms_history_by_hour(date) -> pd.DataFrame:
+    correct_regions = get_correct_regions()
+    history = get_alarms_history(date)
+    merged_alarms = merge_alarms(history, correct_regions)
+    exploded_alarms = explode_by_hour(merged_alarms, date=date)
+    return exploded_alarms
 
-# if __name__ == "__main__":
-#     d = region_hierarchy()
-#     print(merge_alarms(get_alarms_history(dt.date.today()), d))
+
+if __name__ == "__main__":
+    date = dt.date.today() - dt.timedelta(days=1)
+    print(get_alarms_history_by_hour(date))
