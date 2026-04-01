@@ -13,41 +13,55 @@ WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 
 def get_forecast(location, start_date, end_date, unit_group="metric"):
+    start_date = str(start_date)
+    end_date = str(end_date)
+
     BASE_URL = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline"
-    elements = "datetime,humidity,offset,temp,windspeed,pressure,visibility,severerisk,offsetseconds,cloudcover" # TODO: Match with training dataset
+    
+    elements = ['datetime', 'temp', 'feelslike', 'humidity', 'dew',
+       'precip', 'precipprob', 'preciptype', 'windspeed',
+       'winddir', 'pressure', 'visibility', 'cloudcover',
+       'uvindex', 'conditions',]
+    elements = ",".join(elements)
+
     request_url = f"{BASE_URL}/{location}/{start_date}/{end_date}?unitGroup={unit_group}&key={WEATHER_API_KEY}&include=hours&elements={elements}&lang=en"
 
+    print(request_url)
+    return
     response = requests.get(request_url)
 
     if response.status_code == requests.codes.ok:
-        return format_forecast(json.loads(response.text), start_date, end_date)
+        return json.loads(response.text)
     else:
         raise InvalidUsage(response.text, status_code=response.status_code)
 
 
-def format_forecast(raw_forecast, start_date, end_date):
-    """Transform raw forecast data into hourly forecast dict keyed by datetime."""
-    curr_datetime = dt.datetime.now()
-
+def format_forecast(raw_forecast, location):
+    city = location.split(',')[0]
     days = raw_forecast.get("days")
-    hours = []
+
+    result = []
     for day in days:
-        hours.extend(day.get("hours"))
+        hours_data = day.get("hours")
+        date = day.get("datetime")
+        for hour_data in hours_data:
+            time = hour_data.pop("datetime")           
+            hour_data['real_hour_datetime'] = f"{date} {time}"
+            hour_data['city'] = city
+            result.append(hour_data)
 
-    hours = hours[curr_datetime.hour:(curr_datetime.hour + 24)]
+    return result
 
-    forecast = {}
-    for hour in hours:
-        datetime = hour.pop("datetime")
-        h = int(datetime[:2])
-        if h >= curr_datetime.hour:
-            datetime = f"{str(start_date)} {datetime}"
-        else:
-            datetime = f"{str(end_date)} {datetime}"
-        forecast[datetime] = hour
-
-    return forecast
+def get_formated_forecast(location, start_date, end_date):
+    raw = get_forecast(location, start_date, end_date)
+    formated = format_forecast(raw, location)
+    return formated
 
 
 if __name__ == "__main__":
-    print(get_forecast(location="Kyiv,Ukraine", start_date="2026-03-06", end_date="2026-03-07"))
+    today = dt.date.today()
+    tomorrow = today + dt.timedelta(days=1)
+    # raw = get_forecast(location="Kyiv,Ukraine", start_date=today, end_date=tomorrow)
+    # formatted = format_forecast(raw, start_date="2026-03-06", end_date="2026-03-07", location="Kyiv,Ukraine",)
+    formated = get_formated_forecast(location="Kyiv,Ukraine",start_date="2026-03-06", end_date="2026-03-07")
+    print(formated)

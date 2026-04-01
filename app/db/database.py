@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 from app.db.isw_db import IswDb
 from app.db.alarms_db import AlarmsDb
+from app.db.weather_db import WeatherDb
 
 
 class Database:
@@ -10,6 +11,7 @@ class Database:
 
         self.isw = IswDb(db_path)
         self.alarms = AlarmsDb(db_path)
+        self.weather = WeatherDb(db_path)
 
     def close(self) -> None:
         self.con.close()
@@ -34,3 +36,4 @@ if __name__ == '__main__':
     with Database(db_path) as db:
         db.isw.update()
         db.alarms.update()
+        db.weather.update()

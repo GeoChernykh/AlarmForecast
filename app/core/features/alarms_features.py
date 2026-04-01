@@ -105,7 +105,7 @@ def fix_regions(df, regions_path: Path = Path('data/alarms/regions_fixed.pkl')) 
         df['region'] = df['region_city']
         df = df.drop(columns=['region_city', 'region_title'], errors='ignore')
 
-    df['region_id'] = df['region'].apply(lambda x: regions.get(x))
+    df['region_id'] = df['region'].apply(lambda x: regions.get(x)).astype(int)
     return df
 
 def _parse_dt(s: Optional[str]) -> Optional[dt.datetime]:
@@ -188,6 +188,7 @@ def merge_alarms(raw_alarms, correct_regions):
         .reset_index(drop=True)
     )
 
+    result['region_id'] = result['region_id'].astype(int)
     return result
 
 def create_features_alarms(df) -> pd.DataFrame:
