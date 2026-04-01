@@ -1,6 +1,7 @@
 import sqlite3
 from pathlib import Path
 from app.db.isw_db import IswDb
+from app.db.alarms_db import AlarmsDb
 
 
 class Database:
@@ -8,6 +9,7 @@ class Database:
         self.con = sqlite3.connect(db_path)
 
         self.isw = IswDb(db_path)
+        self.alarms = AlarmsDb(db_path)
 
     def close(self) -> None:
         self.con.close()
@@ -18,8 +20,10 @@ class Database:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
+            print("Rolling back")
             self.con.rollback()
         else:
+            print("Commiting")
             self.con.commit()
         self.close()
 
@@ -29,3 +33,4 @@ if __name__ == '__main__':
 
     with Database(db_path) as db:
         db.isw.update()
+        db.alarms.update()

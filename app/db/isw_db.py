@@ -5,7 +5,7 @@ from app.core.scraping.scraper_isw_v2 import scrape_isw
 
 
 class IswDb:
-    def __init__(self, db_path) -> None:
+    def __init__(self, db_path):
         self.con = sqlite3.connect(db_path)
         self.con.row_factory = sqlite3.Row
         self.con.execute("PRAGMA foreign_keys = ON")
@@ -33,9 +33,7 @@ class IswDb:
         with open(path, encoding="utf-8") as f:
             articles = json.load(f)
 
-        self.con.executemany(
-            "INSERT OR IGNORE INTO articles (date, title, url, text) VALUES (:date, :title, :url, :text)", articles
-        )
+        self.add(articles)
         self.con.commit()
 
     def add(self, articles) -> None:
@@ -44,11 +42,7 @@ class IswDb:
         )
         self.con.commit()
 
-    def get(
-        self,
-        start_date: str | None = None,
-        end_date: str | None = None,
-    ) -> list[sqlite3.Row]:
+    def get(self, start_date: str | None = None, end_date: str | None = None, ) -> list[sqlite3.Row]:
         query = """
             SELECT id, date, title, url, text
             FROM articles
@@ -87,5 +81,7 @@ class IswDb:
         articles = scrape_isw(start_date=latest_date, max_pages=100)
         if articles:
             self.add(articles)
+
+        self.con.commit()
 
         
