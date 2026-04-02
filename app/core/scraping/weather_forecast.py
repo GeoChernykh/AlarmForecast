@@ -26,8 +26,8 @@ def get_forecast(location, start_date, end_date, unit_group="metric"):
 
     request_url = f"{BASE_URL}/{location}/{start_date}/{end_date}?unitGroup={unit_group}&key={WEATHER_API_KEY}&include=hours&elements={elements}&lang=en"
 
-    print(request_url)
-    return
+    # print(request_url)
+    # return
     response = requests.get(request_url)
 
     if response.status_code == requests.codes.ok:
@@ -48,6 +48,7 @@ def format_forecast(raw_forecast, location):
             time = hour_data.pop("datetime")           
             hour_data['real_hour_datetime'] = f"{date} {time}"
             hour_data['city'] = city
+            hour_data['preciptype'] = str(hour_data.get('preciptype'))
             result.append(hour_data)
 
     return result

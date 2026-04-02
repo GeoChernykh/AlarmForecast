@@ -36,4 +36,4 @@ if __name__ == '__main__':
     with Database(db_path) as db:
         db.isw.update()
         db.alarms.update()
-        db.weather.update()
+        # db.weather.update()
