@@ -35,8 +35,8 @@ class Database:
 if __name__ == '__main__':
     db_path = Path("app/db/database.db")
 
-    with Database(db_path) as db:
-        db.isw.update()
-        db.alarms.update()
-        # db.weather.update()
-        db.telegram.update()
+    # with Database(db_path) as db:
+    #     db.isw.update()
+    #     db.alarms.update()
+    #     db.weather.update()
+    #     db.telegram.update()

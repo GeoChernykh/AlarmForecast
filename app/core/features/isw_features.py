@@ -241,6 +241,7 @@ stop_words = {
  "dot"}
 
 def create_features_isw(isw):
+    isw['date'] = pd.to_datetime(isw['date']).dt.date
     isw = isw.loc[isw.date >= datetime(2022, 2, 24).date()]
 
     isw["text_length"] = isw['text'].apply(len)
