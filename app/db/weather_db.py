@@ -107,11 +107,14 @@ class WeatherDb:
                 latest_date = today
 
         cities = pd.read_csv('data/alarms/regions.csv')['city'].tolist()
+        cities = set(cities)
         rows = []
 
         for c in cities:
             location = f"{c},Ukraine"
-            weather = get_formated_forecast(location=location, start_date=today, end_date=today + dt.timedelta(days=1))
+            weather = get_formated_forecast(location=location,
+                                            start_date=today, # must be setted to latest date but due to high querry cost setted to today
+                                            end_date=today + dt.timedelta(days=1))
             rows.extend(weather)
 
         self.add(rows)

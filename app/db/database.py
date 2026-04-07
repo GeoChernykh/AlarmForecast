@@ -1,4 +1,6 @@
 import sqlite3
+import pandas as pd
+import datetime as dt
 from pathlib import Path
 from app.db.isw_db import IswDb
 from app.db.alarms_db import AlarmsDb
@@ -31,12 +33,29 @@ class Database:
             self.con.commit()
         self.close()
 
+    def update(self) -> None:
+        self.alarms.update()
+        print("Alarms updated.")
+        
+        weather_last_date = self.weather.get_latest_date()
+        if weather_last_date == dt.date.today():
+            self.weather.update()
+            print("Wether updated.")
+        else:
+            print("Weather already up to date.")
+        
+        self.isw.update()
+        print("ISW updated.")
+
+        self.telegram.update()
+        print("Telegram updated.")      
+
+    def get_merged(self, start_date) -> pd.DataFrame:
+        pass
+
 
 if __name__ == '__main__':
     db_path = Path("app/db/database.db")
 
-    # with Database(db_path) as db:
-    #     db.isw.update()
-    #     db.alarms.update()
-    #     db.weather.update()
-    #     db.telegram.update()
+    with Database(db_path) as db:
+        db.update()
