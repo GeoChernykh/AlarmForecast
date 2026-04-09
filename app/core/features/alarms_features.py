@@ -29,24 +29,24 @@ def explode_by_hour(df, date: Optional[dt.date] = None) -> pd.DataFrame:
         alarm_expanded["time"] == alarm_expanded["start"].dt.floor("h")
     ).astype(int)
 
-    alarm_expanded["has_ended"] = (
-        pd.notna(alarm_expanded["end"]) &
-        (alarm_expanded["time"] == alarm_expanded["end"].dt.floor("h"))
-    ).astype(int)
+    # alarm_expanded["has_ended"] = (
+    #     pd.notna(alarm_expanded["end"]) &
+    #     (alarm_expanded["time"] == alarm_expanded["end"].dt.floor("h"))
+    # ).astype(int)
 
-    alarm_expanded = alarm_expanded.drop(columns=["start", "end"])
-    if date:
-        if isinstance(date, pd.Timestamp):
-            date = date.date()
-        alarm_expanded = alarm_expanded.loc[alarm_expanded["time"].dt.date == date]
+    # alarm_expanded = alarm_expanded.drop(columns=["start", "end"])
+    # if date:
+    #     if isinstance(date, pd.Timestamp):
+    #         date = date.date()
+    #     alarm_expanded = alarm_expanded.loc[alarm_expanded["time"].dt.date == date]
 
     alarm_expanded = (
     alarm_expanded.groupby(['region_id', 'time'], as_index=False)
         .agg({
             'region': 'first',
             'alarm':  'first',
-            'has_started': 'sum',
-            'has_ended':   'sum',
+            # 'has_started': 'sum',
+            # 'has_ended':   'sum',
         })
         .reset_index(drop=True)
     )
@@ -190,6 +190,3 @@ def merge_alarms(raw_alarms, correct_regions):
 
     result['region_id'] = result['region_id'].astype(int)
     return result
-
-def create_features_alarms(df) -> pd.DataFrame:
-    pass

@@ -54,14 +54,14 @@ def get_alarms_history(date: dt.date):
         "Accept": "application/json",
     }
 
-    result = None
     i = 0
-    while not result:
+    while True:
         i += 1
         try:
             response = requests.get(BASE_URL, headers=headers, timeout=10)
             response.raise_for_status()
             result = response.json()
+            break
         except (requests.RequestException, ValueError) as e:
             print(f"Error fetching alarm status: {e}")
         time.sleep(2*i)
@@ -70,6 +70,10 @@ def get_alarms_history(date: dt.date):
 
 def get_alarms_history_by_hour(date) -> pd.DataFrame:
     history = get_alarms_history(date)
+    
+    if not history:
+        return pd.DataFrame()
+
     merged_alarms = merge_alarms(history, correct_regions)
     exploded_alarms = explode_by_hour(merged_alarms, date=date)
     return exploded_alarms
