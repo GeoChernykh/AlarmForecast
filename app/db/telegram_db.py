@@ -43,7 +43,7 @@ class TelegramDb:
         """)
         self.con.commit()
 
-    def load_existing(self, path: Path = Path('data/telegram/telegram_hourly_features_v3.csv')) -> None:
+    def load_existing(self, path: Path = Path('data/telegram/telegram_hourly_features_v4.csv')) -> None:
         path = Path(path)
 
         if not path.exists():
