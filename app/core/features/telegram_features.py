@@ -162,7 +162,7 @@ def _build_hourly_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     full_range = pd.date_range(
         start=hourly["hour_rounded"].min(),
-        end=hourly["hour_rounded"].max(),
+        end=pd.Timestamp.now(tz=TIMEZONE).floor("h"),
         freq="h",
         tz=TIMEZONE,
     )

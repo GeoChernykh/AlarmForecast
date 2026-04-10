@@ -62,14 +62,15 @@ def merge_all_data(alarms, weather, isw, telegram, region_ids=region_ids, encode
     isw_cluster_cols = [col for col in df.columns if col.startswith("isw_cluster")]
     df[isw_cluster_cols] = df[isw_cluster_cols].fillna(0)
         
-    df["visibility"] = df["visibility"].ffill()
-    df["uvindex"] = df["uvindex"].ffill()
+    df["visibility"] = df.groupby('region_id')["visibility"].ffill()
+    df["uvindex"] = df.groupby("region_id")["uvindex"].ffill()
+    df['temp'] = df.groupby('region_id')['temp'].ffill(limit=12)
         
     df['messages_count'] = df['messages_count'].fillna(0)
 
-    df["year"] = df["time"].dt.year
-    df["month"] = df["time"].dt.month
-    df["day"] = df["time"].dt.day 
+    # df["year"] = df["time"].dt.year
+    # df["month"] = df["time"].dt.month
+    # df["day"] = df["time"].dt.day 
     df["hour"] = df["time"].dt.hour
     df['day_of_week'] = df['time'].dt.dayofweek
     df['is_weekend'] = (df['day_of_week'] >= 5).astype(int)
