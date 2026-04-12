@@ -5,10 +5,26 @@ import time
 from urllib.parse import urljoin
 from tqdm import tqdm
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+import re
 
 
-def scrape_isw(start_date, end_date, save_result=False, file_name="isw_data.json", max_pages=3):
+def scrape_isw(start_date: date | str = date(2022, 2, 24), end_date: date | str = date.today(),
+               save_result=False, file_name="isw_data_v2.json", max_pages=3):
+    # Convert string dates to date objects
+    if isinstance(start_date, str):
+        start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+    elif isinstance(start_date, datetime):
+        start_date = start_date.date()
+
+    if start_date is None:
+        start_date = date(2022, 2, 24)
+    
+    if isinstance(end_date, str):
+        end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+    elif isinstance(end_date, datetime):
+        end_date = end_date.date()
+    
     base_url = "https://understandingwar.org"
 
     headers = {
@@ -17,9 +33,8 @@ def scrape_isw(start_date, end_date, save_result=False, file_name="isw_data.json
 
     all_articles_links = []
 
-    url = f"{base_url}/research/?_date_from={start_date}%2C{end_date}&_teams=russia-ukraine"
-
     for page in tqdm(range(1, max_pages + 1), desc="Scraping pages:"):
+        url = f"{base_url}/research/?_date_from={start_date.strftime('%Y-%m-%d')}%2C{end_date.strftime('%Y-%m-%d')}&_teams=russia-ukraine"
         if page != 1:
             url += f"&_paged={page}"
 
@@ -57,57 +72,58 @@ def scrape_isw(start_date, end_date, save_result=False, file_name="isw_data.json
             title_tag = page_soup.select_one('h1.gb-headline, h1#page-title, h1')
             title = title_tag.text.strip() if title_tag else "no title"
 
-            date = "no data"
+            date_ = "no data"
             date_tag = page_soup.select_one('h6.gb-text')
             if date_tag and "202" in date_tag.text:
-                date = date_tag.text.strip()
+                date_ = date_tag.text.strip()
             else:
                 meta_date = page_soup.find('meta', property='article:published_time')
                 if meta_date:
-                    date = meta_date.get('content', '').split('T')[0]
+                    date_ = meta_date.get('content', '').split('T')[0]
 
-            takeaways = []
+            text_div = page_soup.find("div", id="printable-area").find("div", class_="dynamic-entry-content")
+            
+            endnotes = text_div.find("div", title="Endnotes")
+            if endnotes:
+                endnotes.decompose()
 
-            kt_container = page_soup.find(attrs={"data-id": "key-takeaways"})
-            if kt_container:
-                list_elem = kt_container.find(['ul', 'ol'])
-                if list_elem:
-                    for li in list_elem.find_all('li'):
-                        takeaways.append(li.text.strip())
+            text = text_div.get_text(separator=" ", strip=False)
+            
+            # Clean the text: remove URLs, newlines, and bracketed numbers
+            text = re.sub(r'https?://\S+', '', text)
+            text = re.sub(r'www\.\S+', '', text)
+            text = re.sub(r'Endnotes \S+', '', text)
+            text = re.sub(r'\n+', ' ', text)
+            text = re.sub(r'\[\d+\]', '', text)
+            text = re.sub(r'\s+', ' ', text).strip()
+        
+            # Parse date with multiple format options
+            if date_ == "no data":
+                continue
+            
+            parsed_date = None
+            for fmt in ("%B %d, %Y", "%Y-%m-%d"):
+                try:
+                    parsed_date = datetime.strptime(date_, fmt).date()
+                    break
+                except ValueError:
+                    continue
+            
+            if parsed_date is None:
+                continue
 
-            if not takeaways:
-                headers_tags = page_soup.find_all(['h2', 'h3', 'strong'])
-                for header in headers_tags:
-                    if "Key Takeaways" in header.text or "Toplines" in header.text:
-                        parent = header.parent if header.name == 'strong' else header
-                        curr = parent.find_next_sibling()
-                        while curr:
-                            if curr.name in ['ul', 'ol']:
-                                for li in curr.find_all('li'):
-                                    takeaways.append(li.text.strip())
-                                break
-
-                            nested_list = curr.find(['ul', 'ol'])
-                            if nested_list:
-                                for li in nested_list.find_all('li'):
-                                    takeaways.append(li.text.strip())
-                                break
-
-                            if curr.name in ['h2', 'h3']:
-                                break
-                            curr = curr.find_next_sibling()
-                        if takeaways:
-                            break
-
-            if not takeaways:
-                takeaways.append("no key takeways")
-
-            news_data.append({
-                "date": date,
-                "title": title,
-                "url": link,
-                "key_takeaways": takeaways
-            })
+            if start_date <= parsed_date <= end_date:
+                news_data.append({
+                    "date": parsed_date.strftime("%Y-%m-%d"),
+                    "title": title,
+                    "url": link,
+                    "text": text
+                })
+                out_of_range = 0  # reset on a valid article
+            else:
+                out_of_range += 1
+                if out_of_range >= 3:  # stop only after 3 consecutive misses
+                    break
 
             time.sleep(0.5)
 
@@ -160,9 +176,9 @@ def _get_last_date_from_json(file_path: Path) -> datetime | None:
     return max(dates) if dates else None
 
 def _run_scraper_range():
-    data_file = Path("data/isw/isw_data.json")
+    data_file = Path("data/isw/isw_data_v2.json")
 
-    last_dt = _get_last_date_from_json(data_file)
+    last_dt = _get_last_date_from_json(data_file) if data_file.exists() else None
     today = datetime.today()
 
     today_str = today.strftime("%Y-%m-%d")
@@ -216,7 +232,10 @@ def _run_scraper_range():
         start_str = default_start.strftime("%Y-%m-%d")
         end_str = today.strftime("%Y-%m-%d")
         print(f"no existing ISW data => scraping full range {start_str} to {end_str}")
-        scrape_isw(start_date=start_str, end_date=end_str, save_result=True, max_pages=100)
+        scrape_isw(start_date=start_str, end_date=end_str, # TODO: add result to database
+                   save_result=True, file_name="isw_data_v2", 
+                   max_pages=100)
 
 if __name__ == "__main__":
     _run_scraper_range()
+    # scrape_isw(start_date=date.today() - timedelta(days=60), save_result=True, file_name="temp", max_pages=100)

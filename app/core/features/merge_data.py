@@ -4,6 +4,7 @@ import joblib
 from sklearn.preprocessing import OrdinalEncoder
 from app.core.features.weather_features import add_region_ids
 from app.core.features.isw_features import create_features_isw
+from app.core.features.alarms_features import add_neighbor_alarm_count
 
 
 encoder = joblib.load("app/models/preprocessing/merged_df_encoder.joblib")
@@ -56,6 +57,25 @@ def merge_all_data(alarms, weather, isw, telegram, region_ids=region_ids, encode
     df = df.drop(columns=["date"])
     df = df.drop(["city", "region"], axis=1, errors="ignore")
             
+    # preprocessing
+
+    df = df.sort_values(['region_id', 'time'])
+
+    all_alarms = df.groupby("time")["alarm"].sum().rename("num_alarms").reset_index()
+
+    df = pd.merge(df, all_alarms, on="time", how="left")
+    # df["other_alarms_count"] = df["num_alarms"] - df["alarm"]
+    for i in range(24):
+        df[f"alarms_count_{i+1}h_ago"] = df["num_alarms"].shift(i+1)
+
+    for i in range(24):
+        df[f"alarm_status_{i+1}h_ago"] = df.groupby("region_id")["alarm"].shift(i+1)
+
+    df = df.drop(columns="num_alarms")
+    
+    df = add_neighbor_alarm_count(df)
+    df['neighbor_alarm_count'] = df.groupby("region_id")['neighbor_alarm_count'].shift(1)
+
     df["text_length"] = df["text_length"].fillna(0)
     df["preciptype"] = df["preciptype"].fillna("None")
             
@@ -75,23 +95,11 @@ def merge_all_data(alarms, weather, isw, telegram, region_ids=region_ids, encode
     df['day_of_week'] = df['time'].dt.dayofweek
     df['is_weekend'] = (df['day_of_week'] >= 5).astype(int)
 
-    cat_cols = list(df.select_dtypes(include=["object", "category"]).columns)
-    if cat_cols:
-        df[cat_cols] = encoder.transform(df[cat_cols])
+    cat_cols = ['preciptype', 'conditions']
+    df[cat_cols] = encoder.transform(df[cat_cols])
 
-    all_alarms = df.groupby("time")["alarm"].sum().rename("num_alarms").reset_index()
-    df = pd.merge(df, all_alarms, on="time", how="left")
-
-    for i in range(12):
-        df[f"alarms_count_{i+1}h_ago"] = df.groupby("region_id")["num_alarms"].shift(i+1)
-
-    df = df.drop(columns=["num_alarms"])
-
-    for i in range(24):
-        df[f"alarm_status_{i+1}h_ago"] = df.groupby("region_id")["alarm"].shift(i+1)
-
+    df = df.loc[~df.temp.isna()]
     df = df.loc[~df.time.isna()]
-    df = df.loc[~df["temp"].isna()]
     df = df.dropna(axis=0).reset_index(drop=True)
     assert not df.empty
 
