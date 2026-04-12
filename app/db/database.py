@@ -57,19 +57,16 @@ class Database:
             isw_start_dt = start_dt - pd.Timedelta(days=35)
             isw_start_date = isw_start_dt.strftime('%Y-%m-%d')
 
-        # Отримуємо дані напряму, без try-except
         alarms_rows = self.alarms.get(start_date=start_date) if start_date else self.alarms.get()
         weather_rows = self.weather.get(start_date=start_date) if start_date else self.weather.get()
         telegram_rows = self.telegram.get(start_date=start_date) if start_date else self.telegram.get()
         isw_rows = self.isw.get(start_date=isw_start_date) if start_date else self.isw.get()
 
-        # Конвертуємо в датафрейми
         df_alarms = pd.DataFrame([dict(row) for row in alarms_rows])
         df_weather = pd.DataFrame([dict(row) for row in weather_rows])
         df_telegram = pd.DataFrame([dict(row) for row in telegram_rows])
         df_isw = pd.DataFrame([dict(row) for row in isw_rows])
 
-        # Зливаємо все
         final_df = merge_all_data(df_alarms, df_weather, df_isw, df_telegram)
 
         # Фільтруємо "запасні" дні
