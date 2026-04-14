@@ -39,7 +39,13 @@ const REGION_MAP = {
   31: "Київ",
 };
 
-const VALID_REGIONS = new Set(Object.values(REGION_MAP));
+const ALWAYS_RED_REGIONS = [
+  "Луганська область",
+  "Автономна Республіка Крим",
+  "Севастополь"
+];
+
+const VALID_REGIONS = new Set([...Object.values(REGION_MAP), ...ALWAYS_RED_REGIONS]);
 
 // ─── Build 24 time slots starting from current hour ──────────────────────────
 // If now is 16:00 → slots: 16:00, 17:00, ..., 23:00, 00:00, ..., 15:00
@@ -149,18 +155,31 @@ const fetchPredictions = async (url, slots) => {
 
   const raw = json.predictions_by_id ?? json.predictions ?? json.regions_forecast ?? json;
 
+  const normalizeProb = (p) => (p > 1 ? p / 100 : p);
 
-  // If keyed by region_id → convert to GeoJSON names
   const firstKey = Object.keys(raw)[0];
-  if (!isNaN(Number(firstKey))) {
-    const converted = {};
-    for (const [idStr, hours] of Object.entries(raw)) {
-      const name = REGION_MAP[Number(idStr)];
-      if (name) converted[name] = hours;
+  const isKeyedById = !isNaN(Number(firstKey));
+
+  const converted = {};
+
+  for (const [key, hours] of Object.entries(raw)) {
+    const regionName = isKeyedById ? REGION_MAP[Number(key)] : key;
+    if (regionName) {
+      converted[regionName] = {};
+      for (const [timeStr, prob] of Object.entries(hours)) {
+        converted[regionName][timeStr] = normalizeProb(prob);
+      }
     }
-    return converted;
   }
-  return raw;
+
+  ALWAYS_RED_REGIONS.forEach(region => {
+    converted[region] = {};
+    slots.forEach(slot => {
+      converted[region][slot.label] = 1.0;
+    });
+  });
+
+  return converted;
 };
 
 // ─── Sparkline SVG component ──────────────────────────────────────────────────
