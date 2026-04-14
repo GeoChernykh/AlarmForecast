@@ -22,8 +22,6 @@ class AlarmsDb:
                 region TEXT NOT NULL,
                 time TEXT NOT NULL,
                 alarm INTEGER NOT NULL,
-                has_started INTEGER NOT NULL,
-                has_ended INTEGER NOT NULL,
                 PRIMARY KEY (region_id, time)
             )
             """
@@ -50,7 +48,7 @@ class AlarmsDb:
         self.con.executemany(
             """
             INSERT OR REPLACE INTO alarms 
-            VALUES (:region_id, :region, :time, :alarm, :has_started, :has_ended)
+            VALUES (:region_id, :region, :time, :alarm)
             """,
             alarms
         )
@@ -94,6 +92,7 @@ class AlarmsDb:
                 print("No existing data. Scraping...")
                 latest_date = dt.date(2022, 2, 24)
 
+        print(f"Scraping alarms from {latest_date} to {dt.date.today()}")
         date_range = pd.date_range(latest_date, dt.date.today() + dt.timedelta(days=1), freq='d')
 
         for date in date_range:

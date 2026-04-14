@@ -7,6 +7,7 @@ from app.db.alarms_db import AlarmsDb
 from app.db.weather_db import WeatherDb
 from app.db.telegram_db import TelegramDb
 from app.core.features.merge_data import merge_all_data
+from app.core.features.isw_features import create_features_isw
 
 class Database:
     def __init__(self, db_path):
@@ -38,7 +39,7 @@ class Database:
         print("Alarms updated.")
         
         weather_last_date = self.weather.get_latest_date()
-        if weather_last_date == dt.date.today():
+        if weather_last_date != dt.date.today() + dt.timedelta(days=1):
             self.weather.update()
             print("Weather updated.")
         else:
@@ -56,6 +57,8 @@ class Database:
             start_dt = pd.to_datetime(start_date)
             isw_start_dt = start_dt - pd.Timedelta(days=35)
             isw_start_date = isw_start_dt.strftime('%Y-%m-%d')
+            alarms_start_dt = start_dt - pd.Timedelta(hours=25)
+            alarms_start_date = alarms_start_dt.strftime("%Y-%m-%d %H:%H:%S")
 
         alarms_rows = self.alarms.get(start_date=start_date) if start_date else self.alarms.get()
         weather_rows = self.weather.get(start_date=start_date) if start_date else self.weather.get()
@@ -69,10 +72,8 @@ class Database:
 
         final_df = merge_all_data(df_alarms, df_weather, df_isw, df_telegram)
 
-        # Фільтруємо "запасні" дні
         if start_date and not final_df.empty:
-            target_start = pd.to_datetime(start_date, utc=True).tz_convert("Europe/Kyiv")
-            final_df = final_df[final_df['time'] >= target_start]
+            final_df = final_df[final_df['time'] >= start_date]
             final_df = final_df.reset_index(drop=True)
 
         return final_df

@@ -162,7 +162,7 @@ def _build_hourly_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     full_range = pd.date_range(
         start=hourly["hour_rounded"].min(),
-        end=hourly["hour_rounded"].max(),
+        end=pd.Timestamp.now(tz=TIMEZONE).floor("h"),
         freq="h",
         tz=TIMEZONE,
     )
@@ -297,6 +297,31 @@ def preprocess(
     # --- feature engineering on hourly data ---
     hourly, vectorizer = _add_nlp_features(hourly, vectorizer, fit_vectorizer)
     hourly = _add_rolling_features(hourly)
+    
+    # shift by 1 to prevent data leakage
+    cols_to_shift = [
+        'messages_count',
+        'has_threat_sum',
+        'nlp_артобстрілу',
+        'nlp_бпла',
+        'nlp_відбій',
+        'nlp_відбій_тривоги',
+        'nlp_дніпропетровська',
+        'nlp_донецька',
+        'nlp_запорізька',
+        'nlp_нікополь',
+        'nlp_нікополь_нікопольська',
+        'nlp_нікопольська',
+        'nlp_повітряна',
+        'nlp_повітряна_тривога',
+        'nlp_тривога',
+        'nlp_тривоги',
+        'nlp_харківська',
+        'msg_count_last_3h',
+        'msg_count_last_24h',
+        'threat_diff_1h'
+        ]
+    hourly[cols_to_shift] = hourly[cols_to_shift].shift(1).fillna(0)
 
     return hourly, vectorizer
 

@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import datetime as dt
 from typing import Optional
 from pathlib import Path
@@ -29,24 +30,24 @@ def explode_by_hour(df, date: Optional[dt.date] = None) -> pd.DataFrame:
         alarm_expanded["time"] == alarm_expanded["start"].dt.floor("h")
     ).astype(int)
 
-    alarm_expanded["has_ended"] = (
-        pd.notna(alarm_expanded["end"]) &
-        (alarm_expanded["time"] == alarm_expanded["end"].dt.floor("h"))
-    ).astype(int)
+    # alarm_expanded["has_ended"] = (
+    #     pd.notna(alarm_expanded["end"]) &
+    #     (alarm_expanded["time"] == alarm_expanded["end"].dt.floor("h"))
+    # ).astype(int)
 
-    alarm_expanded = alarm_expanded.drop(columns=["start", "end"])
-    if date:
-        if isinstance(date, pd.Timestamp):
-            date = date.date()
-        alarm_expanded = alarm_expanded.loc[alarm_expanded["time"].dt.date == date]
+    # alarm_expanded = alarm_expanded.drop(columns=["start", "end"])
+    # if date:
+    #     if isinstance(date, pd.Timestamp):
+    #         date = date.date()
+    #     alarm_expanded = alarm_expanded.loc[alarm_expanded["time"].dt.date == date]
 
     alarm_expanded = (
     alarm_expanded.groupby(['region_id', 'time'], as_index=False)
         .agg({
             'region': 'first',
             'alarm':  'first',
-            'has_started': 'sum',
-            'has_ended':   'sum',
+            # 'has_started': 'sum',
+            # 'has_ended':   'sum',
         })
         .reset_index(drop=True)
     )
@@ -191,5 +192,80 @@ def merge_alarms(raw_alarms, correct_regions):
     result['region_id'] = result['region_id'].astype(int)
     return result
 
-def create_features_alarms(df) -> pd.DataFrame:
-    pass
+def add_neighbor_alarm_count(df):
+    """
+    Додає колонку 'neighbor_alarm_count' до датафрейму.
+ 
+    Параметри:
+        df: pd.DataFrame з колонками ['region_id', 'time', 'alarm']
+ 
+    Повертає:
+        df з новою колонкою 'neighbor_alarm_count' —
+        кількість сусідніх регіонів, де була тривога в ту саму годину.
+    """
+    NEIGHBORS = {
+        3:  [4, 5, 10, 21, 24],           # Хмельницька: Вінницька, Рівненська, Житомирська, Тернопільська, Черкаська
+        4:  [3, 10, 15, 17, 18, 21, 24],  # Вінницька: Хмельницька, Житомирська, Кіровоградська, Миколаївська, Одеська, Тернопільська, Черкаська
+        5:  [3, 8, 10, 21, 27],           # Рівненська: Хмельницька, Волинська, Житомирська, Тернопільська, Львівська
+        8:  [5, 10, 25, 27],              # Волинська: Рівненська, Житомирська, Чернігівська, Львівська (+ Білорусь/Польща)
+        9:  [12, 15, 16, 19, 22, 23, 24, 28],  # Дніпропетровська: Запорізька, Кіровоградська, Луганська, Полтавська, Харківська, Херсонська, Черкаська, Донецька
+        10: [3, 4, 5, 8, 14, 24, 25],    # Житомирська: Хмельницька, Вінницька, Рівненська, Волинська, Київська, Черкаська, Чернігівська
+        11: [13, 27],                     # Закарпатська: Івано-Франківська, Львівська
+        12: [9, 15, 17, 23, 28],          # Запорізька: Дніпропетровська, Кіровоградська, Миколаївська, Херсонська, Донецька
+        13: [11, 21, 26, 27],             # Івано-Франківська: Закарпатська, Тернопільська, Чернівецька, Львівська
+        14: [10, 19, 20, 24, 25, 31],     # Київська: Житомирська, Полтавська, Сумська, Черкаська, Чернігівська, Київ
+        15: [4, 9, 12, 17, 19, 24],       # Кіровоградська: Вінницька, Дніпропетровська, Запорізька, Миколаївська, Полтавська, Черкаська
+        16: [9, 19, 20, 22, 28],          # Луганська: Дніпропетровська, Полтавська, Сумська, Харківська, Донецька
+        17: [4, 12, 15, 18, 23],          # Миколаївська: Вінницька, Запорізька, Кіровоградська, Одеська, Херсонська
+        18: [4, 17],                      # Одеська: Вінницька, Миколаївська (+ Молдова/Румунія)
+        19: [9, 14, 15, 16, 20, 22, 24],  # Полтавська: Дніпропетровська, Київська, Кіровоградська, Луганська, Сумська, Харківська, Черкаська
+        20: [14, 16, 19, 22, 25],         # Сумська: Київська, Луганська, Полтавська, Харківська, Чернігівська
+        21: [3, 4, 5, 13, 26],            # Тернопільська: Хмельницька, Вінницька, Рівненська, Івано-Франківська, Чернівецька
+        22: [9, 16, 19, 20, 25],          # Харківська: Дніпропетровська, Луганська, Полтавська, Сумська, Чернігівська
+        23: [9, 12, 17],                  # Херсонська: Дніпропетровська, Запорізька, Миколаївська (+ Крим)
+        24: [3, 4, 9, 10, 14, 15, 19, 31],# Черкаська: Хмельницька, Вінницька, Дніпропетровська, Житомирська, Київська, Кіровоградська, Полтавська, Київ
+        25: [8, 10, 14, 20, 22],          # Чернігівська: Волинська, Житомирська, Київська, Сумська, Харківська
+        26: [13, 18, 21],                 # Чернівецька: Івано-Франківська, Одеська, Тернопільська (+ Молдова/Румунія)
+        27: [5, 8, 11, 13, 21],           # Львівська: Рівненська, Волинська, Закарпатська, Івано-Франківська, Тернопільська
+        28: [9, 12, 16, 22],              # Донецька: Дніпропетровська, Запорізька, Луганська, Харківська
+        31: [14, 24],                     # Київ (місто): Київська, Черкаська
+    }
+    
+    df = df.drop(columns='neighbor_alarm_count', errors='ignore').copy()
+
+    pivot = (
+        df.pivot_table(index="time", columns="region_id", values="alarm", aggfunc="max")
+        .fillna(0)
+    )
+ 
+    regions = pivot.columns.tolist()
+    region_idx = {r: i for i, r in enumerate(regions)}
+    R = len(regions)
+ 
+    adj = np.zeros((R, R), dtype=np.int8)
+    for region, neighbors in NEIGHBORS.items():
+        if region not in region_idx:
+            continue
+        i = region_idx[region]
+        for nb in neighbors:
+            if nb in region_idx:
+                adj[i, j := region_idx[nb]] = 1
+ 
+    alarm_matrix = pivot.to_numpy(dtype=np.int8)
+    neighbor_counts = alarm_matrix @ adj
+ 
+    result_pivot = pd.DataFrame(
+        neighbor_counts,
+        index=pivot.index,
+        columns=pivot.columns,
+    )
+ 
+    # melt → отримуємо (time, region_id, neighbor_alarm_count)
+    lookup = (
+        result_pivot
+        .reset_index()
+        .melt(id_vars="time", var_name="region_id", value_name="neighbor_alarm_count")
+    )
+ 
+    df = df.merge(lookup, on=["time", "region_id"], how="left")
+    return df
