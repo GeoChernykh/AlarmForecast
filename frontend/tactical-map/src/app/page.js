@@ -147,7 +147,8 @@ const fetchPredictions = async (url, slots) => {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
 
-  const raw = json.predictions_by_id ?? json.predictions ?? json;
+  const raw = json.predictions_by_id ?? json.predictions ?? json.regions_forecast ?? json;
+
 
   // If keyed by region_id → convert to GeoJSON names
   const firstKey = Object.keys(raw)[0];
@@ -262,14 +263,22 @@ export default function TacticalDashboard() {
   // 24 slots from current hour
   const timeSlots = useMemo(() => currentTime ? buildTimeSlots(currentTime) : [], [currentTime]);
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     if (!currentTime) return;
     setIsRefreshing(true);
-    setTimeout(() => {
+
+    try {
+      // Викликаємо твій реальний Flask API
+      const realData = await fetchPredictions("http://127.0.0.1:5000/forecast", timeSlots);
+      setPredictionData(realData);
+    } catch (error) {
+      console.error("Не вдалося отримати дані з API. Вмикаю демо-режим.", error);
+      // Якщо Flask вимкнений, сайт не впаде, а просто покаже демо-дані
       setPredictionData(generateMockPredictions(currentTime));
+    } finally {
       setIsRefreshing(false);
-    }, 500);
-  }, [currentTime]);
+    }
+  }, [currentTime, timeSlots]);
 
   useEffect(() => {
     if (currentTime) loadData();
