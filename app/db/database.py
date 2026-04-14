@@ -60,6 +60,7 @@ class Database:
             alarms_start_dt = start_dt - pd.Timedelta(hours=25)
             alarms_start_date = alarms_start_dt.strftime("%Y-%m-%d %H:%H:%S")
 
+        alarms_rows = self.alarms.get(start_date=start_date) if start_date else self.alarms.get()
         alarms_rows = self.alarms.get(start=alarms_start_date) if start_date else self.alarms.get()
         weather_rows = self.weather.get(start_date=start_date) if start_date else self.weather.get()
         telegram_rows = self.telegram.get(start_date=start_date) if start_date else self.telegram.get()
