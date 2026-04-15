@@ -1,235 +1,190 @@
-# Ukraine Alert Forecast
+# README
 
-This project is a machine learning-powered system designed to predict air raid alert probabilities across Ukrainian regions for the upcoming 24 hours. It leverages data from various sources to train a model and provide forecasts via a REST API, with an interactive map for visualization.
-
-**Live Demo:** [ukraine-alert-forecast.vercel.app](https://ukraine-alert-forecast.vercel.app)
-
----
 
 ## Project Overview
 
-The core idea is to automate the collection of relevant data, process it into meaningful features, and use a trained model to forecast potential alerts. The system runs a daily pipeline to update predictions, ensuring timely and accurate information.
+The Air Raid Alarm Prediction System is a full-stack machine learning application designed to forecast Ukraine air raid alerts for the next 24 hours. It combines historical alarm records, weather forecasts, Telegram channel signals, and ISW reports to produce region-level alert probability forecasts.
 
-Key components include:
-- Data gathering from alarms, weather, Telegram, and ISW sources
-- Feature engineering and model retraining
-- Prediction generation and API serving
-- A user-friendly frontend for viewing forecasts
-
----
-
-## Important Note on Data
-
-Please be aware that the historical datasets needed for training are not part of this repository due to their complexity and size. Reconstructing them involves:
-- Scraping alarm data from historical APIs
-- Processing ISW reports
-- Collecting Telegram history with proper credentials
-- Fetching weather data
-
-This process can be time-consuming. The repository serves as a blueprint for the system, with the live version operating on a pre-built dataset.
+This repository contains the production backend, preprocessing and modeling code, saved model artifacts, and a Next.js frontend for interactive visualization.
 
 ---
 
 ## System Architecture
 
-### Backend (Hosted on AWS EC2)
-- Automated cron jobs handle the nightly data pipeline
-- Data collection, merging, feature creation, and model updates occur sequentially
-- Predictions are stored in S3 and served through a Flask API
+### Layers
+- **Data Ingestion and Persistence:** `app/core/scraping/` and `db/` store raw and merged data into `app/db/database.db`.
+- **Feature Engineering:** `app/core/features/` contains alarm, weather, Telegram, ISW, and merge logic.
+- **Model Training and Inference:** `app/core/model_scripts/` includes `lgbm_retrain.py` and `lgbm_predict.py`.
+- **Production Backend:** `app/api/alarm_forecast.py` exposes a Flask REST API.
+- **Frontend Presentation:** `frontend/tactical-map/` is a Next.js application that renders geospatial forecasts using Ukraine region boundary data.
 
-### Frontend (Deployed on Vercel)
-- Built using React and Next.js
-- Displays forecasts on an interactive map
-- Communicates with the backend via authenticated API calls
-
-### Daily Update Schedule (UTC)
-
-| Time | Task |
-|------|------|
-| 02:00 | Gather alarm data |
-| 02:45 | Collect Telegram messages |
-| 03:15 | Fetch weather forecasts |
-| 03:30 | Retrieve ISW updates |
-| 04:00 | Merge datasets |
-| 04:15 | Engineer features |
-| 04:30 | Retrain the model |
-| 05:00 | Generate and upload predictions |
+### Production Components
+- **Backend:** Flask app served with uWSGI on AWS EC2
+- **Model:** Serialized LightGBM pipeline at `models/lgbm_pipeline.joblib`
+- **Inference Output:** JSON predictions stored in `data/predictions/alarm_predictions.json`
+- **Frontend:** Next.js tactical map application in `frontend/tactical-map/`
 
 ---
 
-## API Reference
+## Deployment Process
 
-The backend provides a straightforward API for accessing forecasts.
+The system was deployed to AWS EC2 with the following phases:
 
-### Endpoints
+1. **Infrastructure provisioning**
+   - Provisioned an EC2 instance for the backend and frontend.
+   - Configured security groups to allow HTTP/HTTPS and protected SSH.
+   - Used the SSH key at `keys/alarm_prediction.ppk` for secure access.
 
-- `GET /latest`: Retrieves the complete 24-hour prediction for all regions
-- `GET /health`: Checks the service status
+2. **Environment configuration**
+   - Installed Python 3.x, Node.js, and npm on the EC2 instance.
+   - Cloned the repository to the server.
 
-### Security
+3. **Backend deployment**
+   - Created a Python virtual environment and installed backend dependencies.
+   - Configured uWSGI to run the Flask app at `app/api/alarm_forecast.py`.
+   - Used uWSGI as the WSGI bridge for concurrent inference requests.
 
-Requests to the forecast endpoint need an API key in the header:
+4. **Frontend deployment**
+   - Installed frontend packages in `frontend/tactical-map/`.
+   - Built the Next.js application for production.
+   - Started the frontend with `npm start`.
+
+5. **Process management**
+   - Used PM2 to keep the backend and frontend processes running after logout.
+
+---
+
+## Data Flow Pipeline
+
+1. **Data ingestion**
+   - Scraping modules collect raw data from Telegram, ISW reports, weather APIs, and alarm feeds.
+
+2. **Persistence**
+   - The `db/` layer stores historical and merged data in the SQLite database.
+
+3. **Feature engineering**
+   - The system builds spatial and temporal features, including neighbor-region alarm status and weather-related features.
+
+4. **Preprocessing**
+   - Serialized preprocessing artifacts are loaded from `models/preprocessing/`.
+   - Categorical encoding, scaling, and time-based transformations are applied.
+
+5. **Inference**
+   - `app/core/model_scripts/lgbm_predict.py` loads the model and computes hourly alert probabilities.
+
+6. **API serving**
+   - The Flask API returns the forecast JSON to clients.
+
+7. **Frontend rendering**
+   - The Next.js app consumes API data and shows alerts on a geographic map.
+
+---
+
+## Architectural Evolution
+
+### Changes since H/W #2
+- **Non-linear production model:** moved from baseline linear/logistic regression to a serialized LightGBM pipeline.
+- **Decoupled pipeline:** separated experimental notebooks in `machine learning/` from production code in `app/` and `models/`.
+- **Frontend integration:** added a dedicated Next.js layer for map-based visualization instead of static analysis outputs.
+
+---
+
+## Challenges and Lessons Learned
+
+### What went wrong compared to the original plan
+- **Data merging complexity:** aligning asynchronous sources such as ISW, weather forecasts, and alarm timestamps required more careful timestamp handling than initially planned.
+- **High-dimensional NLP feature processing:** combining sparse text features from Telegram/ISW with tabular data increased dataset complexity and made simple models inadequate.
+- **Forecast input constraints:** delivering live spatial/temporal features for continuous deployment required a stronger inference engine and more robust preprocessing than the original design assumed.
+
+---
+
+## Automation and Scheduling
+
+### Prediction automation
+- Generates new forecasts every 30 minutes using live data and the LightGBM inference engine.
+- Example cron job:
+  ```bash
+  */30 * * * * /home/ubuntu/AlarmForecast/.venv/bin/python3 -m app.core.model_scripts.lgbm_predict
+  ```
+
+### Retraining automation
+- Retrains the model weekly to prevent drift.
+- Example cron job:
+  ```bash
+  0 3 * * 1 /home/ubuntu/AlarmForecast/.venv/bin/python3 -m app.core.model_scripts.lgbm_retrain
+  ```
+
+---
+
+## Repository Structure
+
 ```
-x-api-key: YOUR_API_KEY
-```
-
----
-
-## Data Sources
-
-The model relies on diverse data types:
-- **Alarms**: Past alert records by region
-- **Weather**: Forecasted conditions
-- **Telegram**: Messages from monitored channels
-- **ISW**: War institute reports
-- **Merged Data**: Combined inputs for training
-
----
-
-## Machine Learning Model
-
-- **Framework**: LightGBM for multi-output classification
-- **Objective**: Predict alert probabilities hourly per region
-- **Inputs**: Historical lags, weather metrics, text features, time-based variables
-- **Performance** (averaged over retrains):
-  - F1 Score: ~0.819
-  - Precision: ~0.812
-  - Recall: ~0.825
-  - AUC-ROC: ~0.923
-- **Update Frequency**: Daily retraining
-
----
-
-## Frontend Application
-
-Developed with React and Vite, hosted on Vercel.
-
-Features include:
-- Choropleth map showing alert risks
-- Hourly forecast slider
-- Detailed region views with charts
-- Animation for time progression
-- Daily updates at 06:00 UTC
-
----
-
-## Project Structure
-
-```
-alarm_forecast.py                 # Main Flask server
 app/
-├── errors.py                     # Error management
-└── core/
-    ├── features/                 # Feature processing scripts
-    │   ├── alarms_features.py
-    │   ├── isw_features.py
-    │   ├── merge_data.py
-    │   ├── telegram_features.py
-    │   └── weather_features.py
-    ├── model_scripts/            # Training and prediction
-    │   ├── lgbm_predict.py
-    │   └── lgbm_retrain.py
-    └── scraping/                 # Data scrapers
-        ├── alarm.py
-        ├── scraper_isw.py
-        ├── telegram_parser.py
-        └── weather_forecast.py
-db/                               # Database handlers
-models/                           # Saved models and preprocessors
-data/                             # Datasets and predictions
-eda/                              # Analysis notebooks
-frontend/tactical-map/            # Next.js app
-keys/                             # Credentials
-machine learning/                 # Model experiments
-requirements.txt                  # Dependencies
-README.md                         # This file
+  api/alarm_forecast.py
+  core/
+    features/
+    model_scripts/
+    scraping/
+  errors.py
+  db/
+models/
+  lgbm_pipeline.joblib
+  preprocessing/
+data/
+  predictions/alarm_predictions.json
+eda/
+frontend/tactical-map/
+keys/
+machine learning/
+README.md
+requirements.txt
 ```
 
 ---
 
-## Installation and Setup
+## Local Setup
 
-### Prerequisites
-- Python 3.8+
-- Node.js for frontend
-- AWS account for deployment
-
-### Local Setup
-
-1. Clone the repository:
+1. Clone the repo:
    ```bash
-   git clone https://github.com/yourusername/AlarmPrediction.git
+   git clone https://github.com/GeoChernykh/AlarmForecast.git
    cd AlarmPrediction
    ```
 
-2. Set up Python environment:
+2. Create and activate a Python virtual environment:
    ```bash
    python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   .venv\Scripts\activate
+   ```
+
+3. Install Python dependencies:
+   ```bash
    pip install -r requirements.txt
    ```
 
-3. Configure environment variables (create `.env`):
-   ```env
-   ALARM_API_KEY=your-key
-   WEATHER_API_KEY=your-key
-   TG_API_ID=your-id
-   API_HASH=your-hash
-   AWS_ACCESS_KEY_ID=your-key
-   AWS_SECRET_ACCESS_KEY=your-secret
-   S3_BUCKET=your-bucket
-   API_KEY=your-api-key
-   ```
-
-### API Credentials
-
-- **Alerts.in.ua**: Obtain from their API page
-- **Telegram**: Get API ID and hash from my.telegram.org
-- **Weather**: Use Open-Meteo or similar
-- **AWS S3**: Create bucket and IAM user with S3 permissions
-
-### Backend Deployment (EC2)
-
-1. Install system packages:
-   ```bash
-   sudo apt update
-   sudo apt install python3-pip nginx
-   ```
-
-2. Set up the Flask service with systemd:
-   - Create `/etc/systemd/system/flaskapp.service`
-   - Configure Gunicorn to run the app
-
-3. Configure Nginx as reverse proxy on port 80
-
-4. Set up cron for daily pipeline
-
-### Frontend Deployment (Vercel)
-
-1. Navigate to frontend:
+4. Install frontend dependencies:
    ```bash
    cd frontend/tactical-map
    npm install
-   npm run build
    ```
 
-2. Connect to Vercel and set env vars:
-   - `API_KEY`
-   - `EC2_HOST`
+5. Run the backend:
+   ```bash
+   cd ../../
+   python app/api/alarm_forecast.py
+   ```
+
+6. Build and run the frontend:
+   ```bash
+   cd frontend/tactical-map
+   npm run build
+   npm start
+   ```
 
 ---
 
-## Acknowledgments
+## Notes
 
-Data and inspiration from:
-- alerts.in.ua for alert data
-- Open-Meteo for weather
-- Institute for the Study of War
-- Various Telegram channels
-- LightGBM documentation
-
----
-
-## License
-
-This project is for educational and research purposes. No datasets are included.
+- The repository does not include the full historical training datasets.
+- The project is intended for educational and research purposes.
+- Model artifacts and database files are expected to be generated or restored in the live deployment environment.
+'
