@@ -1,305 +1,255 @@
-# Alarm Forecasting Project
+# Ukraine Alert Forecast
 
-This project is a data science application for forecasting air raid alarms in Ukraine. It integrates multiple data sources including alarm data, Institute for the Study of War (ISW) reports, Telegram messages, and weather forecasts to predict alarm occurrences using machine learning models.
+A machine learning system that forecasts air raid alert probabilities across all Ukrainian regions for the next 24 hours. Predictions are served via a REST API and visualized on an interactive map updated regularly.
 
-## Project Structure
+**Live:** [Deployed on Vercel and AWS EC2]
+
+---
+
+## Overview
+
+The system collects data from multiple sources, merges it, engineers features, and generates predictions using a LightGBM model. The frontend displays the forecast as a heatmap over a Ukraine map with hourly resolution. Predictions are updated every 30 minutes via cron job.
+
+---
+
+## ⚠️ Data Collection Notice
+
+The historical dataset required to train the model is **not included** in this repository and is non-trivial to reconstruct:
+
+- **Alarm data** — requires running the historical scraper from scratch
+- **ISW** — requires downloading and processing ISW reports
+- **Telegram** — requires an active Telegram account, API credentials, and time to collect history
+- **Weather** — relatively straightforward via the provided scripts
+
+Full historical backfill can take significant time and disk space. The pipeline assumes this data already exists.
+
+**This repo is primarily a reference implementation.**
+
+---
+
+## Architecture
+
+### Backend (AWS EC2)
+- Cron job runs lgbm_predict.py every 30 minutes to generate fresh predictions
+- Flask app serves the `/forecast` endpoint, reading predictions from `data/predictions/alarm_predictions.json`
+
+### Frontend (Vercel)
+- Next.js app
+- Fetches data from backend API with API key authentication
+
+### Prediction Pipeline
+
+Predictions are generated every 30 minutes via cron:
+- Run `python model_scripts/lgbm_predict.py` to generate new predictions
+
+---
+
+## API
+
+The backend exposes a simple REST API for retrieving the latest forecast.
+
+### Endpoints
+
+#### `GET /forecast`
+> Returns the full 24-hour forecast for all regions.
+
+### Authentication
+
+All requests require an API key:
+
+```http
+x-api-key: <ALARM_API_KEY>
+```
+
+---
+
+## Data
+
+| Type | Description |
+|------|-------------|
+| **Alarms** | Historical air raid alert records per region |
+| **Weather** | Weather forecast data per region |
+| **Telegram** | Telegram channel monitoring |
+| **ISW** | Institute for the Study of War reports |
+| **Merged** | Combined dataset for modeling |
+
+---
+
+## Model
+
+- **Algorithm:** LightGBM
+- **Task:** Forecasting alert probabilities per region per hour
+- **Features:** Engineered from alarm history, weather, NLP signals, temporal features
+- **Retraining:** Manual or as needed
+- **Inference:** Runs every 30 minutes
+
+---
+
+## Frontend
+
+Built with **Next.js**, deployed on **Vercel**.
+
+- Interactive choropleth map colored by alert probability
+- 24-hour forecast visualization
+- Per-region details
+
+---
+
+## Repository Structure
 
 ```
-alarm_forecast.py          # Main Flask application entry point
-README.md                  # This file
-requirements.txt           # Python dependencies
-test.ipynb                 # Test notebook
-app/                       # Flask application
-├── errors.py              # Custom error handlers
-└── core/
-    ├── features/          # Feature engineering modules
-    │   ├── alarms_features.py     # Alarm data feature extraction
-    │   ├── isw_features.py        # ISW report feature extraction
-    │   ├── merge_data.py          # Data merging utilities
-    │   ├── telegram_features.py   # Telegram data feature extraction
-    │   └── weather_features.py    # Weather data feature extraction
-    ├── model_scripts/     # Machine learning scripts
-    │   ├── lgbm_predict.py        # Prediction script using LightGBM
-    │   └── lgbm_retrain.py        # Model retraining script
-    └── scraping/           # Data scraping modules
-        ├── alarm.py               # Alarm data scraper
-        ├── scraper_isw.py         # ISW report scraper
-        ├── telegram_parser.py     # Telegram data parser
-        └── weather_forecast.py    # Weather data scraper
-db/                        # Database modules
-├── alarms_db.py           # Alarm data database handler
-├── database.py            # Main database interface
-├── isw_db.py              # ISW data database handler
-├── telegram_db.py         # Telegram data database handler
-└── weather_db.py          # Weather data database handler
-models/                    # Trained machine learning models
-├── lgbm_pipeline.joblib   # LightGBM pipeline model
-└── preprocessing/         # Preprocessing artifacts
-    ├── isw_kmeans.joblib
-    ├── isw_ohe.joblib
-    ├── isw_pca.joblib
-    ├── isw_vectorizer.joblib
-    ├── merged_df_encoder.joblib
-    └── tg_vectorizer.joblib
-data/                      # Data files
-├── alarms/                # Alarm data
-├── isw/                   # ISW report data
-├── merged/                # Merged datasets
-├── predictions/           # Prediction outputs
-├── telegram/              # Telegram data
-└── weather/               # Weather data
-eda/                       # Exploratory data analysis notebooks
-frontend/                  # Frontend application
-└── tactical-map/          # Next.js tactical map visualization
-machine learning/          # Machine learning experiment notebooks
+DS_lab/
+├── alarm_forecast.py          # Flask API server
+├── app/                       # Backend modules
+│   ├── errors.py              # Error handling
+│   └── core/
+│       ├── features/          # Feature engineering
+│       │   ├── alarms_features.py
+│       │   ├── isw_features.py
+│       │   ├── merge_data.py
+│       │   ├── telegram_features.py
+│       │   └── weather_features.py
+│       ├── model_scripts/     # Model training and prediction
+│       │   ├── lgbm_predict.py
+│       │   └── lgbm_retrain.py
+│       └── scraping/          # Data collection scripts
+│           ├── alarm.py
+│           ├── scraper_isw.py
+│           ├── telegram_parser.py
+│           └── weather_forecast.py
+├── db/                        # Database modules
+├── models/                    # Model artifacts
+├── data/                      # Data files
+├── eda/                       # Exploratory data analysis notebooks
+├── frontend/
+│   └── tactical-map/          # Next.js frontend
+├── keys/                      # API keys and credentials
+├── machine learning/          # ML experiments
+├── requirements.txt           # Python dependencies
+└── README.md
 ```
 
-## Module Descriptions
+---
 
-### Core Application (`app/`)
-- **`alarm_forecast.py`**: Main Flask application that serves forecast data via REST API endpoints.
-- **`errors.py`**: Custom exception handling for the Flask application.
+## Setup & Deployment
 
-### Features (`app/core/features/`)
-- **`alarms_features.py`**: Processes alarm data, including exploding alarm periods by hour and calculating features like alarm duration and regional counts.
-- **`isw_features.py`**: Extracts features from ISW reports, including text vectorization and clustering.
-- **`merge_data.py`**: Utilities for merging data from different sources into a unified dataset.
-- **`telegram_features.py`**: Processes Telegram messages, extracting sentiment and temporal features.
-- **`weather_features.py`**: Handles weather forecast data, including regional mapping and feature engineering.
+### 1. Clone & Environment
 
-### Model Scripts (`app/core/model_scripts/`)
-- **`lgbm_predict.py`**: Loads the trained LightGBM model and generates predictions for current hour.
-- **`lgbm_retrain.py`**: Retrains the LightGBM model with new data.
+```bash
+git clone <your-repo-url>
+cd DS_lab
+python -m venv .venv
+.venv\Scripts\activate  # On Windows
+pip install -r requirements.txt
+```
 
-### Scraping (`app/core/scraping/`)
-- **`alarm.py`**: Scrapes real-time alarm data from Ukraine Alarm API.
-- **`scraper_isw.py`**: Scrapes ISW daily reports from their website.
-- **`telegram_parser.py`**: Parses Telegram channel messages for relevant information.
-- **`weather_forecast.py`**: Fetches weather forecast data from APIs.
+Copy and configure environment variables:
 
-### Database (`db/`)
-- **`database.py`**: Main database class that manages connections and provides unified interface to all data tables.
-- **`alarms_db.py`**: Handles alarm data storage and retrieval.
-- **`isw_db.py`**: Manages ISW report data.
-- **`telegram_db.py`**: Handles Telegram message data.
-- **`weather_db.py`**: Manages weather forecast data.
+```bash
+cp .env.example .env  # If exists, or create .env
+# Fill in credentials
+```
 
-### Frontend (`frontend/tactical-map/`)
-A Next.js application that provides a tactical map visualization of alarm forecasts and historical data.
+---
 
-## Installation
+### 2. API Keys & Credentials
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd DS_lab
-   ```
+#### Telegram API
+For Telegram data collection:
 
-2. Create a virtual environment:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
+```env
+TG_API_ID=your-telegram-api-id
+API_HASH=your-telegram-api-hash
+```
 
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+#### Weather API
+```env
+WEATHER_API_KEY=your-weather-api-key
+```
 
-4. Set up environment variables:
-   Create a `.env` file with necessary API keys (e.g., `ALARM_API_KEY`).
+#### Alarm API
+```env
+ALARM_API_KEY=your-alarm-api-key
+```
 
-5. Initialize the database:
-   ```bash
-   python -c "from app.db.database import Database; db = Database('app/db/database.db'); db.close()"
-   ```
+---
 
-6. For the frontend:
-   ```bash
-   cd frontend/tactical-map
-   npm install
-   ```
+### 3. Backend (AWS EC2)
 
-## Usage
+#### Install dependencies
 
-### Running the Backend
+```bash
+sudo apt update
+sudo apt install python3 python3-pip
+pip install -r requirements.txt
+```
+
+#### Set up cron for predictions
+
+Edit crontab:
+
+```bash
+crontab -e
+```
+
+Add line to run every 30 minutes:
+
+```
+*/30 * * * * cd /path/to/DS_lab && .venv/bin/python model_scripts/lgbm_predict.py
+```
+
+#### Run Flask app
+
 ```bash
 python alarm_forecast.py
 ```
-This starts the Flask server on `http://localhost:5000`.
 
-### API Endpoints
-- `GET /forecast`: Returns current alarm forecast data in JSON format.
+For production, use Gunicorn:
 
-### Running the Frontend
+```bash
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 alarm_forecast:app
+```
+
+---
+
+### 4. Frontend (Vercel)
+
 ```bash
 cd frontend/tactical-map
-npm run dev
-```
-Open `http://localhost:3000` to view the tactical map.
-
-### Data Scraping
-Run individual scrapers as needed:
-```bash
-python -c "from app.core.scraping.alarm import get_alarm_status; print(get_alarm_status())"
+npm install
+npm run dev  # Local development
+npm run build  # Production build
 ```
 
-### Model Prediction
-```bash
-python app/core/model_scripts/lgbm_predict.py
-```
+Deploy by connecting the repo to Vercel. Set environment variables:
 
-## Deployment to AWS
+- `API_BASE_URL`: EC2 instance URL (e.g., `http://your-ec2-ip:5000`)
+- `API_KEY`: Must match `ALARM_API_KEY` on backend
 
-### Prerequisites
-- AWS account with appropriate permissions
-- AWS CLI installed and configured
-- Git repository accessible
+---
 
-### Backend Deployment (Flask App)
+## Environment Variables
 
-#### Option 1: AWS Elastic Beanstalk
-1. Install EB CLI:
-   ```bash
-   pip install awsebcli
-   ```
+| Variable | Description |
+|----------|-------------|
+| `ALARM_API_KEY` | API key for backend authentication |
+| `WEATHER_API_KEY` | Weather API key |
+| `TG_API_ID` | Telegram API ID |
+| `API_HASH` | Telegram API hash |
 
-2. Initialize EB:
-   ```bash
-   eb init -p python-3.9 alarm-forecast
-   ```
+---
 
-3. Create environment:
-   ```bash
-   eb create alarm-forecast-env
-   ```
+## Credits & Sources
 
-4. Deploy:
-   ```bash
-   eb deploy
-   ```
+- Alerts data from alerts.in.ua
+- Weather data from Open-Meteo
+- ISW reports
+- Telegram channels
+- LightGBM for modeling
 
-#### Option 2: AWS EC2
-1. Launch EC2 instance (Ubuntu 20.04, t2.micro or larger).
+---
 
-2. SSH into the instance and install dependencies:
-   ```bash
-   sudo apt update
-   sudo apt install python3 python3-pip git
-   ```
+## License
 
-3. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd DS_lab
-   ```
-
-4. Set up virtual environment and install dependencies:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-5. Set environment variables (API keys) in `.env` file.
-
-6. Run the application:
-   ```bash
-   python alarm_forecast.py
-   ```
-
-7. Use systemd to run as service:
-   Create `/etc/systemd/system/alarm-forecast.service`:
-   ```
-   [Unit]
-   Description=Alarm Forecast Flask App
-   After=network.target
-
-   [Service]
-   User=ubuntu
-   WorkingDirectory=/home/ubuntu/DS_lab
-   ExecStart=/home/ubuntu/DS_lab/.venv/bin/python alarm_forecast.py
-   Restart=always
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-   ```bash
-   sudo systemctl enable alarm-forecast
-   sudo systemctl start alarm-forecast
-   ```
-
-8. Configure security group to allow inbound traffic on port 5000.
-
-### Frontend Deployment (Next.js App)
-
-#### AWS Amplify
-1. Go to AWS Amplify Console.
-
-2. Connect your Git repository.
-
-3. Select the `frontend/tactical-map` folder as the app root.
-
-4. Configure build settings:
-   - Build command: `npm run build`
-   - Output directory: `.next`
-
-5. Add environment variables if needed.
-
-6. Deploy.
-
-#### Alternative: S3 + CloudFront
-1. Build the Next.js app:
-   ```bash
-   cd frontend/tactical-map
-   npm run build
-   npm run export  # If using static export
-   ```
-
-2. Upload `out/` directory to S3 bucket.
-
-3. Configure CloudFront distribution pointing to the S3 bucket.
-
-4. Set up custom domain if needed.
-
-### Database
-The current setup uses SQLite, which is suitable for development. For production:
-
-1. Migrate to AWS RDS (PostgreSQL recommended).
-
-2. Update database connection strings in the code.
-
-3. Run database migrations if needed.
-
-### Scheduled Tasks (Scraping)
-To run scraping scripts periodically:
-
-1. Set up cron jobs on EC2:
-   ```bash
-   crontab -e
-   ```
-   Add lines like:
-   ```
-   0 * * * * /home/ubuntu/DS_lab/.venv/bin/python -c "from app.core.scraping.alarm import scrape_and_store; scrape_and_store()"
-   0 6 * * * /home/ubuntu/DS_lab/.venv/bin/python -c "from app.core.scraping.scraper_isw import scrape_isw; scrape_isw()"
-   ```
-
-2. Alternatively, use AWS Lambda with CloudWatch Events for serverless scraping.
-
-### Monitoring and Logging
-- Use AWS CloudWatch for logs and monitoring.
-- Set up alarms for EC2 instance health.
-- Consider AWS X-Ray for tracing if needed.
-
-### Security Considerations
-- Store API keys and secrets in AWS Systems Manager Parameter Store or Secrets Manager.
-- Use HTTPS (configure SSL certificate).
-- Implement proper authentication/authorization if needed.
-- Regularly update dependencies and apply security patches.
-
-### Cost Optimization
-- Use appropriate EC2 instance types.
-- Set up auto-scaling if traffic varies.
-- Use reserved instances for predictable workloads.
-- Monitor usage with AWS Cost Explorer.
+This is a learning/research project.
