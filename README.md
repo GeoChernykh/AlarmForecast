@@ -33,7 +33,7 @@ The system was deployed to AWS EC2 with the following phases:
 1. **Infrastructure provisioning**
    - Provisioned an EC2 instance for the backend and frontend.
    - Configured security groups to allow HTTP/HTTPS and protected SSH.
-   - Used the SSH key at `keys/alarm_prediction.ppk` for secure access.
+   - Used the SSH key for secure access.
 
 2. **Environment configuration**
    - Installed Python 3.x, Node.js, and npm on the EC2 instance.
