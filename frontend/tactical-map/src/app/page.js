@@ -153,17 +153,17 @@ const fetchPredictions = async (url, slots) => {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
 
-  const raw = json.predictions_by_id ?? json.predictions ?? json.regions_forecast ?? json;
+  // Беремо дані саме з regions_forecast
+  const raw = json.regions_forecast ?? json;
 
+  // Якщо колись прийдуть відсотки (>1) - переводимо в дріб, якщо приходять як 0.18 - залишаємо
   const normalizeProb = (p) => (p > 1 ? p / 100 : p);
-
-  const firstKey = Object.keys(raw)[0];
-  const isKeyedById = !isNaN(Number(firstKey));
 
   const converted = {};
 
-  for (const [key, hours] of Object.entries(raw)) {
-    const regionName = isKeyedById ? REGION_MAP[Number(key)] : key;
+  for (const [apiName, hours] of Object.entries(raw)) {
+    const regionName = apiName.replace(" обл.", " область");
+
     if (regionName) {
       converted[regionName] = {};
       for (const [timeStr, prob] of Object.entries(hours)) {
@@ -324,13 +324,13 @@ export default function TacticalDashboard() {
     const safe     = regions.filter(r => getP(r) < 0.35).length;
     const avgProb  = regions.reduce((s, r) => s + getP(r), 0) / total;
 
-    // Trend: avg probability across all regions per slot
     const trend = timeSlots.map(s => {
       const avg = regions.reduce((sum, r) => sum + (r?.[s.label] ?? 0), 0) / total;
       return avg;
     });
 
     const topDanger = Object.entries(predictionData)
+      .filter(([name]) => !ALWAYS_RED_REGIONS.includes(name)) // <-- Додано фільтр
       .map(([name, hours]) => ({
         name,
         avgProb: timeSlots.reduce((s, sl) => s + (hours?.[sl.label] ?? 0), 0) / timeSlots.length,
