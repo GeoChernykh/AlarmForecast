@@ -107,7 +107,7 @@ forecast['time_str'] = pd.to_datetime(forecast['time']).dt.strftime('%H:%M')
 regions = pd.read_csv("data/alarms/regions.csv")
 forecast = pd.merge(forecast, regions[['region_id', 'region']], how='left', on='region_id')
 
-result = forecast.groupby('region_id').apply(
+result = forecast.groupby('region').apply(
     lambda g: dict(zip(g['time_str'], g['alarm_prob']))
 ).to_dict()
 
