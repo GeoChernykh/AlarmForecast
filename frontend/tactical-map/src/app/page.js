@@ -149,21 +149,22 @@ const generateMockPredictions = (baseDate) => {
  * Значення — float 0.0–1.0 (ймовірність тривоги).
  */
 const fetchPredictions = async (url, slots) => {
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await fetch(url, {
+    cache: 'no-store',
+    headers: {
+      'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
+    }
+  });
+
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
 
-  // Беремо дані саме з regions_forecast
   const raw = json.regions_forecast ?? json;
-
-  // Якщо колись прийдуть відсотки (>1) - переводимо в дріб, якщо приходять як 0.18 - залишаємо
   const normalizeProb = (p) => (p > 1 ? p / 100 : p);
-
   const converted = {};
 
   for (const [apiName, hours] of Object.entries(raw)) {
     const regionName = apiName.replace(" обл.", " область");
-
     if (regionName) {
       converted[regionName] = {};
       for (const [timeStr, prob] of Object.entries(hours)) {
@@ -288,7 +289,7 @@ export default function TacticalDashboard() {
 
     try {
       // Викликаємо твій реальний Flask API
-      const realData = await fetchPredictions("http://127.0.0.1:5000/forecast", timeSlots);
+      const realData = await fetchPredictions("http://100.54.113.147:5000/forecast", timeSlots);
       setPredictionData(realData);
     } catch (error) {
       console.error("Не вдалося отримати дані з API. Вмикаю демо-режим.", error);
