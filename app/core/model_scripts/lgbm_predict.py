@@ -99,7 +99,7 @@ def temperature_scale(probs, temperature=2.0):
     scaled_logits = logits / temperature
     return 1 / (1 + np.exp(-scaled_logits))
 
-TEMPERATURE = 2.5
+TEMPERATURE = 1.8
 forecast['alarm_prob'] = temperature_scale(forecast['alarm_prob'].values, temperature=TEMPERATURE)
 
 forecast['time_str'] = pd.to_datetime(forecast['time']).dt.strftime('%H:%M')
