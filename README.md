@@ -182,6 +182,170 @@ requirements.txt
 
 ---
 
+## Remote Setup on EC2 Instance
+
+### Prerequisites
+- AWS account with permissions to launch EC2 instances
+- SSH key pair for secure access
+
+### Step 1: Launch an EC2 Instance
+1. Log in to the AWS Management Console.
+2. Navigate to the EC2 dashboard.
+3. Click "Launch Instance".
+4. Choose an Amazon Machine Image (AMI):
+   - Recommended: Amazon Linux 2 or Ubuntu Server (free tier eligible).
+5. Select instance type:
+   - t2.micro (free tier) for testing, or t3.medium/t3.large for production.
+6. Configure instance details:
+   - Number of instances: 1
+   - Network: Default VPC
+   - Auto-assign Public IP: Enable
+7. Add storage:
+   - Default 8GB is sufficient for this project.
+8. Configure security group:
+   - Create a new security group or select existing.
+   - Add rules:
+     - SSH (port 22) from your IP or 0.0.0.0/0 (less secure)
+     - HTTP (port 80) from 0.0.0.0/0
+     - HTTPS (port 443) from 0.0.0.0/0
+     - Custom TCP (port 5000) from 0.0.0.0/0 (for Flask app)
+     - Custom TCP (port 3000) from 0.0.0.0/0 (for Next.js app)
+9. Review and launch.
+10. Select or create a key pair, download the .pem file.
+
+### Step 2: Connect to Your EC2 Instance
+1. Open a terminal on your local machine.
+2. Change permissions on the key file:
+   ```bash
+   chmod 400 your-key-pair.pem
+   ```
+3. Connect via SSH:
+   ```bash
+   ssh -i your-key-pair.pem ec2-user@your-instance-public-ip
+   ```
+   - For Ubuntu instances, use `ubuntu@` instead of `ec2-user@`.
+
+### Step 3: Update the System
+- For Amazon Linux 2:
+  ```bash
+  sudo yum update -y
+  ```
+- For Ubuntu:
+  ```bash
+  sudo apt update && sudo apt upgrade -y
+  ```
+
+### Step 4: Install Required Software
+1. Install Python 3 and pip:
+   - Amazon Linux 2:
+     ```bash
+     sudo yum install python3 python3-pip -y
+     ```
+   - Ubuntu:
+     ```bash
+     sudo apt install python3 python3-pip python3-venv -y
+     ```
+
+2. Install Node.js and npm using Node Version Manager (NVM):
+   ```bash
+   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+   source ~/.bashrc
+   nvm install node
+   nvm use node
+   ```
+
+3. Install Git:
+   - Amazon Linux 2:
+     ```bash
+     sudo yum install git -y
+     ```
+   - Ubuntu:
+     ```bash
+     sudo apt install git -y
+     ```
+
+### Step 5: Clone the Repository
+```bash
+git clone https://github.com/GeoChernykh/AlarmForecast.git
+cd AlarmForecast
+```
+
+### Step 6: Set Up the Backend
+1. Create and activate a Python virtual environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+2. Install Python dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Step 7: Set Up the Frontend
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend/tactical-map
+   ```
+
+2. Install Node.js dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Build the application:
+   ```bash
+   npm run build
+   ```
+
+4. Return to the project root:
+   ```bash
+   cd ../..
+   ```
+
+### Step 8: Run the Application
+1. Start the backend (Flask API):
+   ```bash
+   source .venv/bin/activate
+   python app/api/alarm_forecast.py &
+   ```
+
+2. Start the frontend (Next.js):
+   ```bash
+   cd frontend/tactical-map
+   npm start &
+   ```
+
+### Step 9: Access the Application
+- Backend API: http://your-instance-public-ip:5000
+- Frontend: http://your-instance-public-ip:3000
+
+### Step 10: Production Configuration (Optional)
+For a production setup, consider:
+1. Install PM2 for process management:
+   ```bash
+   npm install -g pm2
+   ```
+
+2. Use PM2 to run applications:
+   ```bash
+   pm2 start "source .venv/bin/activate && python app/api/alarm_forecast.py" --name backend
+   pm2 start "cd frontend/tactical-map && npm start" --name frontend
+   pm2 save
+   pm2 startup
+   ```
+
+3. Set up a reverse proxy with Nginx:
+   - Install Nginx
+   - Configure proxy_pass for ports 5000 and 3000
+   - Enable SSL with Let's Encrypt
+
+4. Configure environment variables and secrets securely.
+
+5. Set up monitoring and logging.
+
+---
+
 ## Notes
 
 - The repository does not include the full historical training datasets.
