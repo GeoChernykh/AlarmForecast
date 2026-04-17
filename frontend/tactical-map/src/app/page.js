@@ -150,10 +150,7 @@ const generateMockPredictions = (baseDate) => {
  */
 const fetchPredictions = async (url, slots) => {
   const res = await fetch(url, {
-    cache: 'no-store',
-    headers: {
-      'X-API-Key': process.env.ALARM_FORECAST_API_KEY
-    }
+    cache: 'no-store'
   });
 
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
