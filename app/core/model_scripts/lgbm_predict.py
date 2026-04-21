@@ -113,10 +113,13 @@ result = forecast.groupby('region').apply(
 
 output = {"last_prediction_time": str(dt.datetime.now()), "regions_forecast": {str(k): v for k, v in result.items()}}
 
-forecast_save_dir = Path("data/predictions/alarm_predictions.json")
-if not forecast_save_dir.parent.exists():
-    forecast_save_dir.parent.mkdir(parents=True, exist_ok=True)
+forecast_save_dir = Path("data/predictions")
+file_name = f"alarm_forecast_{dt.datetime.now().strftime("%Y%m%d%H00")}.json"
+save_path = forecast_save_dir / file_name
 
-with open(forecast_save_dir, "w", encoding="utf-8") as f:
+if not forecast_save_dir.exists():
+    forecast_save_dir.mkdir(parents=True, exist_ok=True)
+
+with open(save_path, "w", encoding="utf-8") as f:
     json.dump(output, f, indent=4, ensure_ascii=False)
-print(f"Forecast saved to {forecast_save_dir}")
+print(f"Forecast saved to {save_path}")

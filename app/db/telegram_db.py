@@ -2,7 +2,7 @@ import sqlite3
 import json
 from pathlib import Path
 import pandas as pd
-from app.core.features.telegram_features import preprocess
+from app.core.features.telegram_features import preprocess_messages
 from app.core.scraping.telegram_parser import fetch_messages
 import datetime as dt
 
@@ -111,8 +111,11 @@ class TelegramDb:
                 latest = dt.datetime(2022, 2, 24)
 
         messages = fetch_messages(start_date=latest)
-        preprocessed_msgs, _ = preprocess(messages) 
-        preprocessed_msgs['datetime'] = preprocessed_msgs['datetime'].astype(str)
-        rows = preprocessed_msgs.to_dict('records')
-        if rows:
+        preprocessed_msgs, _ = preprocess_messages(messages) 
+        if not preprocessed_msgs.empty:
+            preprocessed_msgs['datetime'] = preprocessed_msgs['datetime'].astype(str)
+            rows = preprocessed_msgs.to_dict('records')
             self.add(rows)
+            print(f"Added {len(rows)} rows.")
+        else:
+            print("No data added.")

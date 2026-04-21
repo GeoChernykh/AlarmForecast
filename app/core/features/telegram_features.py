@@ -239,7 +239,7 @@ def _add_rolling_features(hourly: pd.DataFrame) -> pd.DataFrame:
 # Public API
 # ---------------------------------------------------------------------------
 
-def preprocess(
+def preprocess_messages(
     df: pd.DataFrame,
     vectorizer: CountVectorizer | None = VECTORIZER,
     fit_vectorizer: bool = False,
@@ -284,6 +284,10 @@ def preprocess(
     9.  NLP features via CountVectorizer
     10. Rolling / diff features
     """
+
+    if df.empty:
+        return None, vectorizer
+
     # --- row-level steps ---
     df = _parse_and_clean_dates(df)
     df = _drop_missing_and_duplicates(df)
@@ -351,7 +355,7 @@ if __name__ == "__main__":
     })
 
 
-    result, vec = preprocess(sample)
+    result, vec = preprocess_messages(sample)
 
     print("Shape:", result.shape)
     print(result.dtypes)
