@@ -1,12 +1,14 @@
 import json
 from flask import Flask, jsonify
 from app.errors import InvalidUsage
+from flask_cors import CORS
 from pathlib import Path
 
 
 forecast_path = Path("data/predictions/alarm_predictions.json")
 
 app = Flask(__name__)
+CORS(app)
 
 
 @app.errorhandler(InvalidUsage)

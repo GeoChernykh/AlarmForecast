@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import datetime as dt
 import joblib
 import json
@@ -92,7 +93,14 @@ for hour in timeline:
     prev_hour_data['alarm'] = pred
     assert ~prev_hour_data[alarm_cols].isna().any().any()
 
+def temperature_scale(probs, temperature=2.0):
+    probs = np.clip(probs, 1e-7, 1 - 1e-7)
+    logits = np.log(probs / (1 - probs))
+    scaled_logits = logits / temperature
+    return 1 / (1 + np.exp(-scaled_logits))
 
+TEMPERATURE = 1.8
+forecast['alarm_prob'] = temperature_scale(forecast['alarm_prob'].values, temperature=TEMPERATURE)
 
 forecast['time_str'] = pd.to_datetime(forecast['time']).dt.strftime('%H:%M')
 

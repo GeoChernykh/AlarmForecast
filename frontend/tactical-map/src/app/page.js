@@ -39,10 +39,16 @@ const REGION_MAP = {
   31: "Київ",
 };
 
-const VALID_REGIONS = new Set(Object.values(REGION_MAP));
+const ALWAYS_RED_REGIONS = [
+  "Луганська область",
+  "Автономна Республіка Крим",
+  "Севастополь"
+];
 
-// ─── Build 24 time slots starting from current hour ──────────────────────────
-// If now is 16:00 → slots: 16:00, 17:00, ..., 23:00, 00:00, ..., 15:00
+const VALID_REGIONS = new Set([...Object.values(REGION_MAP), ...ALWAYS_RED_REGIONS]);
+
+// ─── 24 time slots starting from current hour ──────────────────────────
+
 const buildTimeSlots = (baseDate) => {
   return Array.from({ length: 24 }, (_, i) => {
     const t = new Date(baseDate.getTime() + i * 60 * 60 * 1000);
@@ -129,7 +135,7 @@ const generateMockPredictions = (baseDate) => {
  * ════════════════════════════════════════════════════════════════
  *
  * {
- *   "generated_at": "2025-04-11T16:00:00Z",   ← час генерації (необов'язково)
+ *   "generated_at": "2025-04-11T16:00:00Z",
  *   "predictions_by_id": {
  *     "3":  { "16:00": 0.10, "17:00": 0.08, ..., "15:00": 0.12 },
  *     "22": { "16:00": 0.87, "17:00": 0.91, ..., "15:00": 0.74 },
@@ -143,23 +149,38 @@ const generateMockPredictions = (baseDate) => {
  * Значення — float 0.0–1.0 (ймовірність тривоги).
  */
 const fetchPredictions = async (url, slots) => {
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await fetch(url, {
+    cache: 'no-store',
+    headers: {
+      'X-API-Key': process.env.ALARM_FORECAST_API_KEY
+    }
+  });
+
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
 
-  const raw = json.predictions_by_id ?? json.predictions ?? json;
+  const raw = json.regions_forecast ?? json;
+  const normalizeProb = (p) => (p > 1 ? p / 100 : p);
+  const converted = {};
 
-  // If keyed by region_id → convert to GeoJSON names
-  const firstKey = Object.keys(raw)[0];
-  if (!isNaN(Number(firstKey))) {
-    const converted = {};
-    for (const [idStr, hours] of Object.entries(raw)) {
-      const name = REGION_MAP[Number(idStr)];
-      if (name) converted[name] = hours;
+  for (const [apiName, hours] of Object.entries(raw)) {
+    const regionName = apiName.replace(" обл.", " область");
+    if (regionName) {
+      converted[regionName] = {};
+      for (const [timeStr, prob] of Object.entries(hours)) {
+        converted[regionName][timeStr] = normalizeProb(prob);
+      }
     }
-    return converted;
   }
-  return raw;
+
+  ALWAYS_RED_REGIONS.forEach(region => {
+    converted[region] = {};
+    slots.forEach(slot => {
+      converted[region][slot.label] = 1.0;
+    });
+  });
+
+  return converted;
 };
 
 // ─── Sparkline SVG component ──────────────────────────────────────────────────
@@ -262,14 +283,22 @@ export default function TacticalDashboard() {
   // 24 slots from current hour
   const timeSlots = useMemo(() => currentTime ? buildTimeSlots(currentTime) : [], [currentTime]);
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     if (!currentTime) return;
     setIsRefreshing(true);
-    setTimeout(() => {
+
+    try {
+      // call Flask api
+      const realData = await fetchPredictions("http://100.54.113.147:8000/forecast", timeSlots);
+      setPredictionData(realData);
+    } catch (error) {
+      console.error("Не вдалося отримати дані з API. Вмикаю демо-режим.", error);
+      // if flask is down turn on demo
       setPredictionData(generateMockPredictions(currentTime));
+    } finally {
       setIsRefreshing(false);
-    }, 500);
-  }, [currentTime]);
+    }
+  }, [currentTime, timeSlots]);
 
   useEffect(() => {
     if (currentTime) loadData();
@@ -296,13 +325,13 @@ export default function TacticalDashboard() {
     const safe     = regions.filter(r => getP(r) < 0.35).length;
     const avgProb  = regions.reduce((s, r) => s + getP(r), 0) / total;
 
-    // Trend: avg probability across all regions per slot
     const trend = timeSlots.map(s => {
       const avg = regions.reduce((sum, r) => sum + (r?.[s.label] ?? 0), 0) / total;
       return avg;
     });
 
     const topDanger = Object.entries(predictionData)
+      .filter(([name]) => !ALWAYS_RED_REGIONS.includes(name)) // <-- Додано фільтр
       .map(([name, hours]) => ({
         name,
         avgProb: timeSlots.reduce((s, sl) => s + (hours?.[sl.label] ?? 0), 0) / timeSlots.length,
