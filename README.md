@@ -82,24 +82,6 @@ Recommended to use different instances for frontend and backend
 
 ---
 
-## Architectural Evolution
-
-### Changes since H/W #2
-- **Non-linear production model:** moved from baseline linear/logistic regression to a serialized LightGBM pipeline.
-- **Decoupled pipeline:** separated experimental notebooks in `machine learning/` from production code in `app/` and `models/`.
-- **Frontend integration:** added a dedicated Next.js layer for map-based visualization instead of static analysis outputs.
-
----
-
-## Challenges and Lessons Learned
-
-### What went wrong compared to the original plan
-- **Data merging complexity:** aligning asynchronous sources such as ISW, weather forecasts, and alarm timestamps required more careful timestamp handling than initially planned.
-- **High-dimensional NLP feature processing:** combining sparse text features from Telegram/ISW with tabular data increased dataset complexity and made simple models inadequate.
-- **Forecast input constraints:** delivering live spatial/temporal features for continuous deployment required a stronger inference engine and more robust preprocessing than the original design assumed.
-
----
-
 ## Automation and Scheduling
 
 ### Prediction automation
