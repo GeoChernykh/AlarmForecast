@@ -47,8 +47,8 @@ const ALWAYS_RED_REGIONS = [
 
 const VALID_REGIONS = new Set([...Object.values(REGION_MAP), ...ALWAYS_RED_REGIONS]);
 
-// ─── Build 24 time slots starting from current hour ──────────────────────────
-// If now is 16:00 → slots: 16:00, 17:00, ..., 23:00, 00:00, ..., 15:00
+// ─── 24 time slots starting from current hour ──────────────────────────
+
 const buildTimeSlots = (baseDate) => {
   return Array.from({ length: 24 }, (_, i) => {
     const t = new Date(baseDate.getTime() + i * 60 * 60 * 1000);
@@ -135,7 +135,7 @@ const generateMockPredictions = (baseDate) => {
  * ════════════════════════════════════════════════════════════════
  *
  * {
- *   "generated_at": "2025-04-11T16:00:00Z",   ← час генерації (необов'язково)
+ *   "generated_at": "2025-04-11T16:00:00Z",
  *   "predictions_by_id": {
  *     "3":  { "16:00": 0.10, "17:00": 0.08, ..., "15:00": 0.12 },
  *     "22": { "16:00": 0.87, "17:00": 0.91, ..., "15:00": 0.74 },
@@ -152,7 +152,7 @@ const fetchPredictions = async (url, slots) => {
   const res = await fetch(url, {
     cache: 'no-store',
     headers: {
-      'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
+      'X-API-Key': process.env.ALARM_FORECAST_API_KEY
     }
   });
 
@@ -288,12 +288,12 @@ export default function TacticalDashboard() {
     setIsRefreshing(true);
 
     try {
-      // Викликаємо твій реальний Flask API
+      // call Flask api
       const realData = await fetchPredictions("http://100.54.113.147:8000/forecast", timeSlots);
       setPredictionData(realData);
     } catch (error) {
       console.error("Не вдалося отримати дані з API. Вмикаю демо-режим.", error);
-      // Якщо Flask вимкнений, сайт не впаде, а просто покаже демо-дані
+      // if flask is down turn on demo
       setPredictionData(generateMockPredictions(currentTime));
     } finally {
       setIsRefreshing(false);
