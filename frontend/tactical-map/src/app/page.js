@@ -150,10 +150,7 @@ const generateMockPredictions = (baseDate) => {
  */
 const fetchPredictions = async (url, slots) => {
   const res = await fetch(url, {
-    cache: 'no-store',
-    headers: {
-      'X-API-Key': process.env.ALARM_FORECAST_API_KEY
-    }
+    cache: 'no-store'
   });
 
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -288,8 +285,8 @@ export default function TacticalDashboard() {
     setIsRefreshing(true);
 
     try {
-      // call Flask api
-      const realData = await fetchPredictions("http://100.54.113.147:8000/forecast", timeSlots);
+      // Викликаємо твій реальний Flask API
+      const realData = await fetchPredictions("http://100.54.251.64:8000/forecast", timeSlots);
       setPredictionData(realData);
     } catch (error) {
       console.error("Не вдалося отримати дані з API. Вмикаю демо-режим.", error);
