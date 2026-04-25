@@ -44,16 +44,16 @@ X_test, y_test = X[test_mask], y[test_mask]
 
 # Defining model
 params = {
-    'n_estimators': 545,
+    'n_estimators': 592,
     'max_depth': 7,
-    'num_leaves': 55,
-    'min_child_samples': 61,
-    'learning_rate': 0.14990312773762166,
-    'subsample': 0.9993550543596587,
-    'colsample_bytree': 0.7001986229502264,
-    'reg_alpha': 0.5283198315166077,
-    'reg_lambda': 0.03860654671960752,
-    'min_split_gain': 0.0967522802778745
+    'num_leaves': 60,
+    'min_child_samples': 38,
+    'learning_rate': 0.14983796743221423,
+    'subsample': 0.9337915945737416,
+    'colsample_bytree': 0.7747804530512956,
+    'reg_alpha': 0.04542552662628247,
+    'reg_lambda': 0.3468310912329435,
+    'min_split_gain': 0.061736013814935646
 }
 
 new_model = LGBMClassifier(**params, random_state=42, verbose=-1)
