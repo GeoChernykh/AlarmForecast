@@ -266,7 +266,6 @@ Add the following cron jobs (predictions hourly, retraining weekly on Mondays):
 
 ```bash
 0 * * * * cd /home/ubuntu/AlarmForecast && .venv/bin/python -m app.core.model_scripts.lgbm_predict >> /home/ubuntu/AlarmForecast/cron.log 2>&1
-30 * * * * cd /home/ubuntu/AlarmForecast && .venv/bin/python -m app.core.model_scripts.lgbm_predict >> /home/ubuntu/AlarmForecast/cron.log 2>&1
 0 3 * * 1 cd /home/ubuntu/AlarmForecast && .venv/bin/python -m app.core.model_scripts.lgbm_retrain >> /home/ubuntu/AlarmForecast/cron.log 2>&1
 ```
 
