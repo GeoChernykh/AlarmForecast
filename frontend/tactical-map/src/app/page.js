@@ -286,7 +286,7 @@ export default function TacticalDashboard() {
 
     try {
       // Викликаємо твій реальний Flask API
-      const realData = await fetchPredictions("http://100.54.251.64:8000/forecast", timeSlots);
+      const realData = await fetchPredictions("http://44.211.169.170:8000/forecast", timeSlots);
       setPredictionData(realData);
     } catch (error) {
       console.error("Не вдалося отримати дані з API. Вмикаю демо-режим.", error);
