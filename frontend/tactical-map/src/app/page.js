@@ -594,7 +594,7 @@ export default function TacticalDashboard() {
       <main className="flex-1 flex items-center justify-center relative z-0 w-full pt-20 pb-36 md:pt-24 md:pb-36 px-2">
         <ComposableMap
           projection="geoMercator"
-          projectionConfig={{ scale: isMobile ? 1600 : 2300, center: [31.5, 48.5] }}
+          projectionConfig={{ scale: isMobile ? 1600 : 2100, center: [31.5, 48.5] }}
           className="w-full max-w-6xl h-auto"
         >
           <Geographies geography={GEO_URL}>
